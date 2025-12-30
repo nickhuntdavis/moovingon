@@ -6,6 +6,35 @@ const BASEROW_API_URL = 'https://api.baserow.io/api/database/rows/table';
 const BASEROW_TOKEN = import.meta.env.VITE_BASEROW_TOKEN || 'laIQcMIWcsVRPguGkFaP2kG6nCsGRIob';
 const TABLE_ID = import.meta.env.VITE_BASEROW_TABLE_ID || '786250'; // Table: MoovingOn 345196
 
+/**
+ * Convert a Baserow S3 image URL to a proxy URL to avoid CORS issues
+ * In production (Netlify), use the proxy function. In development, try direct URL first.
+ */
+function getProxiedImageUrl(url: string): string {
+  if (!url) return url;
+  
+  // Check if URL is from Baserow's S3 bucket (needs proxy)
+  const isS3Url = url.includes('baserow-backend') || url.includes('s3.amazonaws.com');
+  
+  if (isS3Url) {
+    // Check if we're in a browser environment
+    const isBrowser = typeof window !== 'undefined';
+    const isProduction = isBrowser && (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('netlify.com'));
+    
+    // Use Netlify function proxy in production
+    if (isProduction) {
+      return `/.netlify/functions/proxy-image?url=${encodeURIComponent(url)}`;
+    }
+    
+    // In development, try direct URL (might work if CORS is configured)
+    // If it fails, the browser will show an error, but we can't catch it here
+    return url;
+  }
+  
+  // For non-S3 URLs (data URLs, local URLs), return as-is
+  return url;
+}
+
 interface BaserowRow {
   id: number;
   [key: string]: any; // Dynamic column fields (field_XXXXX format)
@@ -367,11 +396,15 @@ class BaserowService {
         // Baserow file fields return an array of file objects
         if (Array.isArray(imageField) && imageField.length > 0) {
           imageField.forEach((file: any) => {
-            if (file.url) images.push(file.url);
-            else if (typeof file === 'string') images.push(file);
+            if (file.url) {
+              // Use proxy URL to avoid CORS issues with S3
+              images.push(getProxiedImageUrl(file.url));
+            } else if (typeof file === 'string') {
+              images.push(getProxiedImageUrl(file));
+            }
           });
         } else if (typeof imageField === 'string') {
-          images.push(imageField);
+          images.push(getProxiedImageUrl(imageField));
         }
       }
     }
