@@ -558,26 +558,31 @@ class BaserowService {
         
         if (typeof imageValue === 'string') {
           if (imageValue.startsWith('data:')) {
-            // Data URL from camera - convert to File and upload
+            // Data URL from camera - convert to File, compress, and upload
             console.log(`📸 Converting data URL to file for image_${i + 1}...`);
             const file = this.dataURLtoFile(imageValue, `image_${i + 1}.jpg`);
-            fileRef = await this.uploadFile(file);
+            // Compress before upload
+            const compressedFile = await this.compressImageIfNeeded(file);
+            fileRef = await this.uploadFile(compressedFile);
           } else if (imageValue.startsWith('http://') || imageValue.startsWith('https://')) {
-            // External URL - fetch, convert to File, and upload
+            // External URL - fetch, convert to File, compress, and upload
             console.log(`🌐 Fetching external image: ${imageValue}...`);
             try {
               const response = await fetch(imageValue);
               const blob = await response.blob();
               const file = new File([blob], `image_${i + 1}.jpg`, { type: blob.type || 'image/jpeg' });
-              fileRef = await this.uploadFile(file);
+              // Compress before upload
+              const compressedFile = await this.compressImageIfNeeded(file);
+              fileRef = await this.uploadFile(compressedFile);
             } catch (err) {
               console.warn(`⚠️ Could not fetch external image ${imageValue}, skipping:`, err);
               // Skip this image
             }
           }
         } else if (imageValue && typeof imageValue === 'object' && 'size' in imageValue && 'name' in imageValue) {
-          // Already a File object - upload directly
-          fileRef = await this.uploadFile(imageValue as File);
+          // Already a File object - compress and upload
+          const compressedFile = await this.compressImageIfNeeded(imageValue as File);
+          fileRef = await this.uploadFile(compressedFile);
         } else if (imageValue && typeof imageValue === 'object') {
           // Already a Baserow file reference - use as-is
           fileRef = imageValue;

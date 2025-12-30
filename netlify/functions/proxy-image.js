@@ -44,6 +44,9 @@ exports.handler = async (event, context) => {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET',
         'Cache-Control': 'public, max-age=31536000, immutable',
+        'X-Content-Type-Options': 'nosniff',
+        // Enable image optimization hints
+        'Accept-CH': 'DPR, Viewport-Width, Width',
       },
       body: Buffer.from(imageBuffer).toString('base64'),
       isBase64Encoded: true,

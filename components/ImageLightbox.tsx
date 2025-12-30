@@ -102,6 +102,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         <img
           src={currentImage}
           alt={`Image ${currentIndex + 1} of ${images.length}`}
+          loading="eager"
+          decoding="async"
           className="max-w-full max-h-[90vh] object-contain rounded-lg"
         />
       </div>
