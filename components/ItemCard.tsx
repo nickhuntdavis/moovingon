@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Item, ViewMode } from '../types';
-import { Trash2, ChevronLeft, ChevronRight, Edit3, ChevronDown, ChevronUp, X as XIcon } from 'lucide-react';
+import { Trash2, ChevronLeft, ChevronRight, Edit3, ChevronDown, ChevronUp, X as XIcon, Share2 } from 'lucide-react';
 import Badge from './Badge';
 import Button from './Button';
 import InterestModal from './InterestModal';
@@ -14,6 +14,7 @@ interface ItemCardProps {
   onDelete: (id: string) => void;
   onEdit: () => void;
   onRemoveTaker?: (itemId: string, takerIndex: number) => void;
+  isHighlighted?: boolean;
 }
 
 const ItemCard: React.FC<ItemCardProps> = ({ 
@@ -23,24 +24,90 @@ const ItemCard: React.FC<ItemCardProps> = ({
   onUpdateStatus,
   onDelete,
   onEdit,
-  onRemoveTaker
+  onRemoveTaker,
+  isHighlighted = false
 }) => {
   const [interestConfig, setInterestConfig] = useState<{ open: boolean; type: 'TAKE' | 'INTEREST' }>({ open: false, type: 'TAKE' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+  const touchEndY = useRef<number>(0);
   
   const isAvailable = item.status === 'AVAILABLE';
   const isReserved = item.status === 'RESERVED';
   const isTaken = item.status === 'TAKEN';
+  
+  // Get item index for staggered animation (using prime numbers: 2, 3, 5, 7 seconds)
+  const primeDelays = [2, 3, 5, 7];
+  const itemIndexRef = useRef<number>(Math.floor(Math.random() * 1000)); // Random index for stagger
+  const animationDelay = primeDelays[itemIndexRef.current % primeDelays.length] * 1000;
 
   useEffect(() => {
     if (item.images.length <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentImageIndex(prev => (prev + 1) % item.images.length);
-    }, 8000); // Slowed down from 4000ms to 8000ms (8 seconds)
-    return () => clearInterval(timer);
-  }, [item.images.length]);
+    // Stagger animation start with prime number delay
+    let intervalId: NodeJS.Timeout | null = null;
+    const startTimer = setTimeout(() => {
+      intervalId = setInterval(() => {
+        setCurrentImageIndex(prev => (prev + 1) % item.images.length);
+      }, 8000); // Slowed down from 4000ms to 8000ms (8 seconds)
+    }, animationDelay);
+    return () => {
+      clearTimeout(startTimer);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [item.images.length, animationDelay]);
+
+  // Touch handlers for mobile swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+    touchEndY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current || item.images.length <= 1) return;
+    
+    const distanceX = touchStartX.current - touchEndX.current;
+    const distanceY = touchStartY.current - touchEndY.current;
+    const absDistanceX = Math.abs(distanceX);
+    const absDistanceY = Math.abs(distanceY);
+    
+    // Only trigger if horizontal swipe is significant and more than vertical
+    if (absDistanceX > 50 && absDistanceX > absDistanceY * 1.5) {
+      if (distanceX > 0) {
+        // Swipe left - next image
+        setCurrentImageIndex(prev => (prev + 1) % item.images.length);
+      } else {
+        // Swipe right - previous image
+        setCurrentImageIndex(prev => (prev - 1 + item.images.length) % item.images.length);
+      }
+    }
+    
+    // Reset
+    touchStartX.current = 0;
+    touchEndX.current = 0;
+  };
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}${window.location.pathname}#item-${item.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   const nextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -86,17 +153,45 @@ const ItemCard: React.FC<ItemCardProps> = ({
   };
 
   const cardStyle = isTaken ? 'opacity-60 grayscale' : 'opacity-100';
+  const highlightStyle = isHighlighted 
+    ? 'border-4 border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.5)] ring-4 ring-indigo-500/30' 
+    : 'border border-stone-200';
 
   return (
-    <div className={`bg-white rounded-[2rem] shadow-sm border border-stone-200 overflow-hidden flex flex-col h-full transition-all duration-300 hover:shadow-2xl ${cardStyle}`}>
+    <div className={`bg-white rounded-[2rem] shadow-sm ${highlightStyle} overflow-hidden flex flex-col h-full transition-all duration-500 hover:shadow-2xl ${cardStyle} relative`}>
+      {/* Share Button */}
+      {mode === 'FRIEND' && (
+        <button
+          onClick={handleShare}
+          className="absolute top-4 right-4 z-10 bg-white/90 backdrop-blur p-2 rounded-full shadow-lg hover:bg-white transition-all group"
+          aria-label="Share item"
+          title="Share this item"
+        >
+          <Share2 size={16} className={`text-stone-600 group-hover:text-indigo-600 transition-colors ${shareCopied ? 'text-indigo-600' : ''}`} />
+          {shareCopied && (
+            <span className="absolute -top-8 right-0 bg-indigo-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+              Copied!
+            </span>
+          )}
+        </button>
+      )}
+      
       {/* Visual Header / Gallery */}
-      <div className="relative aspect-square bg-stone-100 overflow-hidden group cursor-pointer" onClick={() => item.images.length > 0 && setIsLightboxOpen(true)}>
+      <div 
+        ref={imageContainerRef}
+        className="relative aspect-square bg-stone-100 overflow-hidden group cursor-pointer touch-pan-y"
+        onClick={() => item.images.length > 0 && setIsLightboxOpen(true)}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <img 
           src={item.images[currentImageIndex]} 
           alt={item.title} 
           loading="lazy"
           decoding="async"
-          className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+          className="w-full h-full object-cover transition-opacity duration-500 group-hover:scale-110"
+          style={{ transition: 'opacity 0.5s ease-in-out, transform 1s ease-out' }}
         />
         
         {item.images.length > 1 && (

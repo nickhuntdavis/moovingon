@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PackageOpen, Plus, Heart, MapPin, Clock as ClockIcon, MessageCircle, AlertCircle } from 'lucide-react';
+import { PackageOpen, Plus, Heart, MapPin, Clock as ClockIcon, MessageCircle, AlertCircle, ArrowUpDown, Users } from 'lucide-react';
 import { Item, ViewMode, ItemStatus } from './types';
 import { INITIAL_ITEMS } from './constants';
 import ItemCard from './components/ItemCard';
@@ -24,11 +24,45 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [sortBy, setSortBy] = useState<'default' | 'price' | 'condition'>('default');
+  const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
+  const [shuffledItems, setShuffledItems] = useState<Item[]>([]);
 
   // --- Load items from Baserow on mount ---
   useEffect(() => {
     loadItems();
   }, []);
+
+  // --- Handle URL hash for item sharing ---
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#item-')) {
+      const itemId = hash.replace('#item-', '');
+      setHighlightedItemId(itemId);
+      
+      // Scroll to item after a short delay to ensure DOM is ready
+      setTimeout(() => {
+        const element = document.getElementById(`item-${itemId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Remove highlight after 5 seconds
+          setTimeout(() => {
+            setHighlightedItemId(null);
+          }, 5000);
+        }
+      }, 100);
+    }
+  }, [items]);
+
+  // Fisher-Yates shuffle algorithm
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
 
   const loadItems = async () => {
     setIsLoading(true);
@@ -37,7 +71,11 @@ export default function App() {
       console.log('🔄 App: Loading items from Baserow...');
       const loadedItems = await baserowService.getAllItems();
       console.log(`✅ App: Loaded ${loadedItems.length} items`);
-      setItems(loadedItems.length > 0 ? loadedItems : INITIAL_ITEMS);
+      const itemsToUse = loadedItems.length > 0 ? loadedItems : INITIAL_ITEMS;
+      // Shuffle items on load for random order
+      const shuffled = shuffleArray(itemsToUse);
+      setShuffledItems(shuffled);
+      setItems(shuffled);
     } catch (err: any) {
       console.error('❌ App: Failed to load items from Baserow:', err);
       const errorMsg = err?.message || 'Unknown error';
@@ -48,14 +86,20 @@ export default function App() {
         try {
           const parsed = JSON.parse(saved);
           console.log(`📦 App: Using ${parsed.length} items from localStorage`);
-          setItems(parsed);
+          const shuffled = shuffleArray(parsed);
+          setShuffledItems(shuffled);
+          setItems(shuffled);
         } catch {
           console.log('📦 App: Using initial items');
-          setItems(INITIAL_ITEMS);
+          const shuffled = shuffleArray(INITIAL_ITEMS);
+          setShuffledItems(shuffled);
+          setItems(shuffled);
         }
       } else {
         console.log('📦 App: Using initial items');
-        setItems(INITIAL_ITEMS);
+        const shuffled = shuffleArray(INITIAL_ITEMS);
+        setShuffledItems(shuffled);
+        setItems(shuffled);
       }
     } finally {
       setIsLoading(false);
@@ -278,9 +322,24 @@ export default function App() {
 
   // --- Derived State ---
   const sortedItems = [...items].sort((a, b) => {
+     // First, sort by status (AVAILABLE → RESERVED → TAKEN)
      const statusOrder = { 'AVAILABLE': 0, 'RESERVED': 1, 'TAKEN': 2 };
      const statusDiff = statusOrder[a.status] - statusOrder[b.status];
      if (statusDiff !== 0) return statusDiff;
+     
+     // Then, apply user-selected sort
+     if (sortBy === 'price') {
+       const priceDiff = a.price - b.price;
+       if (priceDiff !== 0) return priceDiff;
+     } else if (sortBy === 'condition') {
+       // Sort by condition: Fair, Good as new, Well Loved
+       const conditionOrder = { 'Fair': 0, 'Good as new': 1, 'Well Loved': 2 };
+       const conditionDiff = (conditionOrder[a.condition as keyof typeof conditionOrder] || 0) - 
+                            (conditionOrder[b.condition as keyof typeof conditionOrder] || 0);
+       if (conditionDiff !== 0) return conditionDiff;
+     }
+     
+     // Finally, sort by creation date (newest first)
      return b.createdAt - a.createdAt;
   });
 
@@ -311,38 +370,38 @@ export default function App() {
 
         {/* Hero Section */}
         {!isLoading && (
-          <div className="mb-16">
+          <div className="mb-8 md:mb-12 lg:mb-16">
             {viewMode === 'ADMIN' ? (
-              <div className="bg-stone-900 rounded-3xl p-8 text-white shadow-xl flex items-center justify-between mb-12">
+              <div className="bg-stone-900 rounded-3xl p-6 md:p-8 text-white shadow-xl flex items-center justify-between mb-8 md:mb-12">
                 <div>
-                  <h2 className="text-2xl font-black mb-1">Owner Dashboard</h2>
-                  <p className="text-stone-400 text-sm">
+                  <h2 className="text-xl md:text-2xl font-black mb-1">Owner Dashboard</h2>
+                  <p className="text-stone-400 text-xs md:text-sm">
                     Managing {items.length} items. {isSaving ? 'Saving...' : 'Synced with Baserow.'}
                   </p>
                 </div>
-              <div className="flex gap-3 flex-wrap">
-                <Button variant="primary" size="sm" onClick={() => { setEditingItem(null); setIsAddingItem(true); }} className="bg-indigo-500 hover:bg-indigo-600 text-white border-none font-bold px-4">
-                  <Plus size={18} className="mr-1" /> Add Item
+              <div className="flex gap-2 md:gap-3 flex-wrap">
+                <Button variant="primary" size="sm" onClick={() => { setEditingItem(null); setIsAddingItem(true); }} className="bg-indigo-500 hover:bg-indigo-600 text-white border-none font-bold px-3 md:px-4 text-xs md:text-sm">
+                  <Plus size={16} className="mr-1" /> Add Item
                 </Button>
-                <Button variant="ghost" size="sm" onClick={handleMigrateLocalData} disabled={isSaving} className="text-stone-300 hover:text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" onClick={handleMigrateLocalData} disabled={isSaving} className="text-stone-300 hover:text-white hover:bg-white/10 text-xs md:text-sm">
                   {isSaving ? 'Migrating...' : '📦 Migrate Local Data'}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setViewMode('FRIEND')} className="text-stone-300 hover:text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" onClick={() => setViewMode('FRIEND')} className="text-stone-300 hover:text-white hover:bg-white/10 text-xs md:text-sm">
                   Exit
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
-              <div className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 lg:gap-10 items-start">
+              <div className="lg:col-span-2 space-y-4 md:space-y-6">
                 <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase mb-2">
                    <PackageOpen size={14} /> Nick's Moving Sale
                 </div>
-                <h2 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-[1.1]">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1]">
                   Take Nick's stuff
                 </h2>
-                <p className="text-xl text-stone-600 leading-relaxed font-medium max-w-xl">
-                  I’m moving back to SA soon and need to re-home these things quickly. Please take my stuff.
+                <p className="text-lg md:text-xl text-stone-600 leading-relaxed font-medium max-w-xl">
+                  I'm moving back to SA soon and need to re-home these things quickly. Please take my stuff.
                 </p>
                 <div className="flex items-center gap-3 text-stone-500 text-sm">
                   <MessageCircle size={18} className="text-indigo-600" />
@@ -350,11 +409,11 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="space-y-4 lg:pt-4">
+              <div className="space-y-3 md:space-y-4 lg:pt-4">
                 <div className="flex items-start gap-3 bg-white p-5 rounded-2xl border border-stone-200 shadow-sm transition-transform hover:-translate-y-1">
                   <ClockIcon className="text-indigo-500 mt-1 flex-shrink-0" size={24} />
                   <div>
-                    <h4 className="font-black text-sm uppercase tracking-tight">Gone by Early Jan</h4>
+                    <h4 className="font-black text-sm uppercase tracking-tight">Gone by Mid Jan</h4>
                     <p className="text-stone-500 text-xs mt-1">First come, first served.</p>
                   </div>
                 </div>
@@ -363,6 +422,15 @@ export default function App() {
                   <div>
                     <h4 className="font-black text-sm uppercase tracking-tight">Central Utrecht</h4>
                     <p className="text-stone-500 text-xs mt-1">Easy collection near the station.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 bg-white p-5 rounded-2xl border border-stone-200 shadow-sm transition-transform hover:-translate-y-1">
+                  <Users className="text-indigo-500 mt-1 flex-shrink-0" size={24} />
+                  <div>
+                    <h4 className="font-black text-sm uppercase tracking-tight">Friends only</h4>
+                    <p className="text-stone-500 text-xs mt-1">
+                      More about sharing in <a href="#faq" className="text-indigo-600 hover:text-indigo-700 font-bold hover:underline">FAQ</a>
+                    </p>
                   </div>
                 </div>
               </div>
@@ -382,24 +450,66 @@ export default function App() {
           </div>
         )}
 
+        {/* Sort Controls - Only show in friend view */}
+        {!isLoading && viewMode === 'FRIEND' && (
+          <div className="mb-6 flex items-center gap-3 flex-wrap">
+            <ArrowUpDown size={18} className="text-stone-400" />
+            <span className="text-sm font-bold text-stone-600">Sort by:</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSortBy('default')}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                  sortBy === 'default'
+                    ? 'bg-indigo-500 text-white shadow-lg'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                Default
+              </button>
+              <button
+                onClick={() => setSortBy('price')}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                  sortBy === 'price'
+                    ? 'bg-indigo-500 text-white shadow-lg'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                Price
+              </button>
+              <button
+                onClick={() => setSortBy('condition')}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                  sortBy === 'condition'
+                    ? 'bg-indigo-500 text-white shadow-lg'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                Condition
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Item Grid */}
         {!isLoading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
             {sortedItems.map(item => (
-              <ItemCard
-                key={item.id}
-                item={item}
-                mode={viewMode}
-                onExpressInterest={handleExpressInterest}
-                onUpdateStatus={handleUpdateStatus}
-                onDelete={handleDeleteItem}
-                onEdit={() => { 
-                  setEditingItem(item); 
-                  setIsAddingItem(false); 
-                  document.getElementById('item-form')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                onRemoveTaker={viewMode === 'ADMIN' ? handleRemoveTaker : undefined}
-              />
+              <div key={item.id} id={`item-${item.id}`}>
+                <ItemCard
+                  item={item}
+                  mode={viewMode}
+                  onExpressInterest={handleExpressInterest}
+                  onUpdateStatus={handleUpdateStatus}
+                  onDelete={handleDeleteItem}
+                  onEdit={() => { 
+                    setEditingItem(item); 
+                    setIsAddingItem(false); 
+                    document.getElementById('item-form')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  onRemoveTaker={viewMode === 'ADMIN' ? handleRemoveTaker : undefined}
+                  isHighlighted={highlightedItemId === item.id}
+                />
+              </div>
             ))}
           </div>
         )}

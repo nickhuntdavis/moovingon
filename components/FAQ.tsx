@@ -51,7 +51,7 @@ const FAQ: React.FC<FAQProps> = ({ viewMode }) => {
   const isDark = viewMode === 'ADMIN';
 
   return (
-    <section className={`mt-20 py-16 px-4 ${isDark ? 'bg-stone-800' : 'bg-white'}`}>
+    <section id="faq" className={`mt-20 py-16 px-4 ${isDark ? 'bg-stone-800' : 'bg-white'}`}>
       <div className="max-w-3xl mx-auto">
         <h2 className={`text-3xl font-black mb-8 ${isDark ? 'text-white' : 'text-stone-900'}`}>
           Frequently Asked Questions

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ImageLightboxProps {
@@ -16,6 +16,44 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   onClose,
   onNavigate,
 }) => {
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+  const touchEndY = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+    touchEndY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current || images.length <= 1) return;
+    
+    const distanceX = touchStartX.current - touchEndX.current;
+    const distanceY = touchStartY.current - touchEndY.current;
+    const absDistanceX = Math.abs(distanceX);
+    const absDistanceY = Math.abs(distanceY);
+    
+    // Only trigger if horizontal swipe is significant and more than vertical
+    if (absDistanceX > 50 && absDistanceX > absDistanceY * 1.5) {
+      if (distanceX > 0) {
+        // Swipe left - next image
+        onNavigate((currentIndex + 1) % images.length);
+      } else {
+        // Swipe right - previous image
+        onNavigate((currentIndex - 1 + images.length) % images.length);
+      }
+    }
+    
+    // Reset
+    touchStartX.current = 0;
+    touchEndX.current = 0;
+  };
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -97,7 +135,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-w-7xl max-h-[90vh] w-full flex items-center justify-center"
+        className="max-w-7xl max-h-[90vh] w-full flex items-center justify-center touch-pan-y"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         <img
           src={currentImage}
