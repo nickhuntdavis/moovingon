@@ -25,6 +25,7 @@ export default function App() {
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [sortBy, setSortBy] = useState<'default' | 'price' | 'condition'>('default');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const [shuffledItems, setShuffledItems] = useState<Item[]>([]);
 
@@ -330,18 +331,33 @@ export default function App() {
      // Then, apply user-selected sort
      if (sortBy === 'price') {
        const priceDiff = a.price - b.price;
-       if (priceDiff !== 0) return priceDiff;
+       if (priceDiff !== 0) {
+         return sortDirection === 'asc' ? priceDiff : -priceDiff;
+       }
      } else if (sortBy === 'condition') {
-       // Sort by condition: Fair, Good as new, Well Loved
-       const conditionOrder = { 'Fair': 0, 'Good as new': 1, 'Well Loved': 2 };
-       const conditionDiff = (conditionOrder[a.condition as keyof typeof conditionOrder] || 0) - 
-                            (conditionOrder[b.condition as keyof typeof conditionOrder] || 0);
-       if (conditionDiff !== 0) return conditionDiff;
+       // Sort by condition: Good as new (0), Fair (1), Well Loved (2)
+       const conditionOrder = { 'Good as new': 0, 'Fair': 1, 'Well Loved': 2 };
+       const conditionDiff = (conditionOrder[a.condition as keyof typeof conditionOrder] ?? 999) - 
+                            (conditionOrder[b.condition as keyof typeof conditionOrder] ?? 999);
+       if (conditionDiff !== 0) {
+         return sortDirection === 'asc' ? conditionDiff : -conditionDiff;
+       }
      }
      
      // Finally, sort by creation date (newest first)
      return b.createdAt - a.createdAt;
   });
+
+  const handleSortClick = (newSortBy: 'default' | 'price' | 'condition') => {
+    if (sortBy === newSortBy) {
+      // Toggle direction if clicking the same sort
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Change sort type and reset to ascending
+      setSortBy(newSortBy);
+      setSortDirection('asc');
+    }
+  };
 
   return (
     <div className={`min-h-screen pb-24 font-sans ${viewMode === 'ADMIN' ? 'bg-stone-900 text-white' : 'bg-stone-50 text-stone-900'}`}>
@@ -407,9 +423,47 @@ export default function App() {
                   <MessageCircle size={18} className="text-indigo-600" />
                   <span>Questions? WhatsApp Nick at <a href="https://wa.me/31618509055" className="font-bold text-indigo-700 hover:underline">+31 6 1850 9055</a></span>
                 </div>
+                
+                {/* Sort Controls - Desktop only, underneath WhatsApp */}
+                <div className="hidden md:flex items-center gap-3 flex-wrap pt-2">
+                  <ArrowUpDown size={16} className="text-stone-400" />
+                  <span className="text-xs font-bold text-stone-600">Sort by:</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleSortClick('default')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        sortBy === 'default'
+                          ? 'bg-indigo-500 text-white shadow-lg'
+                          : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                      }`}
+                    >
+                      Default
+                    </button>
+                    <button
+                      onClick={() => handleSortClick('price')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        sortBy === 'price'
+                          ? 'bg-indigo-500 text-white shadow-lg'
+                          : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                      }`}
+                    >
+                      Price {sortBy === 'price' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </button>
+                    <button
+                      onClick={() => handleSortClick('condition')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        sortBy === 'condition'
+                          ? 'bg-indigo-500 text-white shadow-lg'
+                          : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                      }`}
+                    >
+                      Condition {sortBy === 'condition' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-3 md:space-y-4 lg:pt-4">
+              <div className="hidden lg:block space-y-3 md:space-y-4 lg:pt-4">
                 <div className="flex items-start gap-3 bg-white p-5 rounded-2xl border border-stone-200 shadow-sm transition-transform hover:-translate-y-1">
                   <ClockIcon className="text-indigo-500 mt-1 flex-shrink-0" size={24} />
                   <div>
@@ -429,8 +483,59 @@ export default function App() {
                   <div>
                     <h4 className="font-black text-sm uppercase tracking-tight">Friends only</h4>
                     <p className="text-stone-500 text-xs mt-1">
-                      More about sharing in <a href="#faq" className="text-indigo-600 hover:text-indigo-700 font-bold hover:underline">FAQ</a>
+                      More about sharing in <a href="#faq" className="text-indigo-600 hover:text-indigo-700 font-bold hover:underline" onClick={(e) => {
+                        e.preventDefault();
+                        const faqElement = document.getElementById('faq');
+                        if (faqElement) {
+                          faqElement.scrollIntoView({ behavior: 'smooth' });
+                          // Open the "Can I share this link with other people?" accordion (index 5)
+                          setTimeout(() => {
+                            const shareFAQIndex = 5; // "Can I share this link with other people?"
+                            window.dispatchEvent(new CustomEvent('openFAQ', { detail: shareFAQIndex }));
+                          }, 500);
+                        }
+                      }}>FAQ</a>
                     </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Mobile: Horizontal scrollable info cards */}
+              <div className="lg:hidden -mx-4 px-4 overflow-x-auto pb-2">
+                <div className="flex gap-3 min-w-max">
+                  <div className="flex items-start gap-2 bg-white p-3 rounded-xl border border-stone-200 shadow-sm flex-shrink-0 min-w-[200px]">
+                    <ClockIcon className="text-indigo-500 mt-0.5 flex-shrink-0" size={18} />
+                    <div>
+                      <h4 className="font-black text-xs uppercase tracking-tight">Gone by Mid Jan</h4>
+                      <p className="text-stone-500 text-[10px] mt-0.5">First come, first served.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 bg-white p-3 rounded-xl border border-stone-200 shadow-sm flex-shrink-0 min-w-[200px]">
+                    <MapPin className="text-indigo-500 mt-0.5 flex-shrink-0" size={18} />
+                    <div>
+                      <h4 className="font-black text-xs uppercase tracking-tight">Central Utrecht</h4>
+                      <p className="text-stone-500 text-[10px] mt-0.5">Easy collection near the station.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 bg-white p-3 rounded-xl border border-stone-200 shadow-sm flex-shrink-0 min-w-[200px]">
+                    <Users className="text-indigo-500 mt-0.5 flex-shrink-0" size={18} />
+                    <div>
+                      <h4 className="font-black text-xs uppercase tracking-tight">Friends only</h4>
+                      <p className="text-stone-500 text-[10px] mt-0.5">
+                        More about sharing in <a href="#faq" className="text-indigo-600 hover:text-indigo-700 font-bold hover:underline" onClick={(e) => {
+                          e.preventDefault();
+                          const faqElement = document.getElementById('faq');
+                          if (faqElement) {
+                            faqElement.scrollIntoView({ behavior: 'smooth' });
+                            // Open the "Can I share this link with other people?" accordion (index 5)
+                            setTimeout(() => {
+                              const shareFAQIndex = 5; // "Can I share this link with other people?"
+                              window.dispatchEvent(new CustomEvent('openFAQ', { detail: shareFAQIndex }));
+                            }, 500);
+                          }
+                        }}>FAQ</a>
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -450,15 +555,15 @@ export default function App() {
           </div>
         )}
 
-        {/* Sort Controls - Only show in friend view */}
+        {/* Sort Controls - Mobile only, show in friend view */}
         {!isLoading && viewMode === 'FRIEND' && (
-          <div className="mb-6 flex items-center gap-3 flex-wrap">
-            <ArrowUpDown size={18} className="text-stone-400" />
-            <span className="text-sm font-bold text-stone-600">Sort by:</span>
+          <div className="md:hidden mb-6 flex items-center gap-3 flex-wrap">
+            <ArrowUpDown size={16} className="text-stone-400" />
+            <span className="text-xs font-bold text-stone-600">Sort:</span>
             <div className="flex gap-2">
               <button
-                onClick={() => setSortBy('default')}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                onClick={() => handleSortClick('default')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   sortBy === 'default'
                     ? 'bg-indigo-500 text-white shadow-lg'
                     : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
@@ -467,24 +572,24 @@ export default function App() {
                 Default
               </button>
               <button
-                onClick={() => setSortBy('price')}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                onClick={() => handleSortClick('price')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   sortBy === 'price'
                     ? 'bg-indigo-500 text-white shadow-lg'
                     : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                 }`}
               >
-                Price
+                Price {sortBy === 'price' && (sortDirection === 'asc' ? '↑' : '↓')}
               </button>
               <button
-                onClick={() => setSortBy('condition')}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                onClick={() => handleSortClick('condition')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   sortBy === 'condition'
                     ? 'bg-indigo-500 text-white shadow-lg'
                     : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                 }`}
               >
-                Condition
+                Condition {sortBy === 'condition' && (sortDirection === 'asc' ? '↑' : '↓')}
               </button>
             </div>
           </div>

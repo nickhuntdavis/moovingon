@@ -13,6 +13,18 @@ interface FAQProps {
 const FAQ: React.FC<FAQProps> = ({ viewMode }) => {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
+  // Listen for custom event to open specific FAQ
+  React.useEffect(() => {
+    const handleOpenFAQ = (event: CustomEvent<number>) => {
+      setOpenIndex(event.detail);
+    };
+    
+    window.addEventListener('openFAQ', handleOpenFAQ as EventListener);
+    return () => {
+      window.removeEventListener('openFAQ', handleOpenFAQ as EventListener);
+    };
+  }, []);
+
   const faqs: FAQItem[] = [
     {
       question: "Where are the items located? Where do I pick them up?",
