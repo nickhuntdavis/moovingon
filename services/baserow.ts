@@ -420,24 +420,34 @@ class BaserowService {
 
     // Collect images from multiple image fields
     const images: string[] = [];
+    const itemId = row.id || 'unknown';
+    
     for (let i = 1; i <= 4; i++) {
       const imageField = getField(`image_${i}`);
       if (imageField) {
         // Baserow file fields return an array of file objects
         if (Array.isArray(imageField) && imageField.length > 0) {
-          imageField.forEach((file: any) => {
-            if (file.url) {
-              // Use proxy URL to avoid CORS issues with S3
-              images.push(getProxiedImageUrl(file.url));
+          imageField.forEach((file: any, fileIndex: number) => {
+            if (file && file.url) {
+              const originalUrl = file.url;
+              const proxiedUrl = getProxiedImageUrl(originalUrl);
+              images.push(proxiedUrl);
+              console.log(`🖼️ Item ${itemId}, image_${i}[${fileIndex}]: ${originalUrl.substring(0, 80)}...`);
             } else if (typeof file === 'string') {
-              images.push(getProxiedImageUrl(file));
+              const proxiedUrl = getProxiedImageUrl(file);
+              images.push(proxiedUrl);
+              console.log(`🖼️ Item ${itemId}, image_${i} (string): ${file.substring(0, 80)}...`);
             }
           });
         } else if (typeof imageField === 'string') {
-          images.push(getProxiedImageUrl(imageField));
+          const proxiedUrl = getProxiedImageUrl(imageField);
+          images.push(proxiedUrl);
+          console.log(`🖼️ Item ${itemId}, image_${i} (direct string): ${imageField.substring(0, 80)}...`);
         }
       }
     }
+    
+    console.log(`📸 Item ${itemId} "${getField(BASEROW_COLUMN_MAPPING.title, 'Untitled')}" has ${images.length} image(s)`);
 
     // Collect interested parties from taker fields
     // Parse format: "Name, Taker" or "Name, Interested"
