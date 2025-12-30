@@ -47,13 +47,17 @@ export const STATUS_MAPPING: Record<string, 'AVAILABLE' | 'RESERVED' | 'TAKEN'> 
 
 /**
  * Condition value mapping: Baserow values -> App Condition enum
- * Note: Baserow has "Well loved" (lowercase 'l'), app uses "Well Loved" (capital 'L')
+ * Baserow has exactly three condition types:
+ * - "Good as new"
+ * - "Fair"
+ * - "Well loved" (lowercase 'l')
+ * App uses "Well Loved" (capital 'L') for consistency
  */
 export const CONDITION_MAPPING: Record<string, string> = {
   'Good as new': 'Good as new',
   'Fair': 'Fair',
-  'Well loved': 'Well Loved', // Baserow value -> App value
-  'Well Loved': 'Well Loved', // Also handle if already capitalized
+  'Well loved': 'Well Loved', // Baserow value (lowercase) -> App value (capitalized)
+  'Well Loved': 'Well Loved', // Handle if already capitalized (backward compatibility)
 };
 
 /**

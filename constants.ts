@@ -18,7 +18,7 @@ export const INITIAL_ITEMS: Item[] = [
     title: 'Monstera Deliciosa',
     description: 'Includes the terracotta pot. She is heavy!',
     price: 25,
-    condition: Condition.NEW,
+    condition: Condition.GOOD,
     status: 'RESERVED',
     images: ['https://images.unsplash.com/photo-1614594975525-e45190c55d0b?auto=format&fit=crop&q=80&w=800'],
     // Fix: added missing 'type' property to satisfy the Interest interface

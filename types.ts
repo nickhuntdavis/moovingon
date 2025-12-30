@@ -1,7 +1,6 @@
 export type ItemStatus = 'AVAILABLE' | 'RESERVED' | 'TAKEN';
 
 export enum Condition {
-  NEW = 'Like New',
   GOOD = 'Good as new',
   FAIR = 'Fair',
   USED = 'Well Loved'
