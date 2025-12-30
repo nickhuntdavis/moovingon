@@ -530,8 +530,15 @@ class BaserowService {
     await setField(BASEROW_COLUMN_MAPPING.description, item.description || '');
     await setField(BASEROW_COLUMN_MAPPING.price, item.price);
     
-    // Map condition value (reverse mapping)
-    const conditionValue = Object.entries(CONDITION_MAPPING).find(([_, v]) => v === item.condition)?.[0] || item.condition;
+    // Map condition value (reverse mapping: App -> Baserow)
+    // App uses "Well Loved" (capital L), Baserow uses "Well loved" (lowercase l)
+    let conditionValue: string;
+    if (item.condition === 'Well Loved') {
+      conditionValue = 'Well loved'; // Convert to Baserow format
+    } else {
+      // For "Good as new" and "Fair", they match exactly
+      conditionValue = item.condition;
+    }
     await setField(BASEROW_COLUMN_MAPPING.condition, conditionValue);
     
     // Map status value (reverse mapping)
