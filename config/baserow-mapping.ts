@@ -25,11 +25,7 @@ export const BASEROW_COLUMN_MAPPING = {
   image_3: 'image_3',
   image_4: 'image_4',
   
-  // Interested parties - primary taker (first person who expressed interest)
-  taker_name: 'taker_name',
-  taker_time: 'taker_time',
-  
-  // Additional interested parties - stored as separate numbered taker fields
+  // Interested parties - stored as numbered taker fields (taker_1_name is first, etc.)
   taker_1_name: 'taker_1_name',
   taker_1_time: 'taker_1_time',
   taker_2_name: 'taker_2_name',
