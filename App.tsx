@@ -6,6 +6,7 @@ import ItemCard from './components/ItemCard';
 import ItemForm from './components/ItemForm';
 import AdminAuth from './components/AdminAuth';
 import Button from './components/Button';
+import FAQ from './components/FAQ';
 import baserowService from './services/baserow';
 
 export default function App() {
@@ -197,6 +198,31 @@ export default function App() {
     }
   };
 
+  const handleRemoveTaker = async (itemId: string, takerIndex: number) => {
+    setIsSaving(true);
+    setError(null);
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const updatedItem: Item = {
+      ...item,
+      interestedParties: item.interestedParties.filter((_, idx) => idx !== takerIndex)
+    };
+
+    try {
+      const saved = await baserowService.updateItem(updatedItem);
+      setItems(prev => prev.map(i => i.id === itemId ? saved : i));
+      console.info(`Removed taker ${takerIndex} from item ${itemId}.`);
+    } catch (err) {
+      console.error('Failed to remove taker:', err);
+      setError('Failed to remove from waitlist. Please try again.');
+      // Optimistically update UI anyway
+      setItems(prev => prev.map(i => i.id === itemId ? updatedItem : i));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleAdminAccess = () => {
     if (isAdminAuthenticated) {
       setViewMode(prev => prev === 'ADMIN' ? 'FRIEND' : 'ADMIN');
@@ -372,11 +398,15 @@ export default function App() {
                   setIsAddingItem(false); 
                   document.getElementById('item-form')?.scrollIntoView({ behavior: 'smooth' });
                 }}
+                onRemoveTaker={viewMode === 'ADMIN' ? handleRemoveTaker : undefined}
               />
             ))}
           </div>
         )}
       </main>
+
+      {/* FAQ Section */}
+      <FAQ viewMode={viewMode} />
 
       {/* Footer */}
       <footer className={`mt-20 border-t py-16 px-4 text-center ${viewMode === 'ADMIN' ? 'border-stone-700' : 'border-stone-200'}`}>

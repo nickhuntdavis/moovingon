@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Item, ViewMode } from '../types';
-import { Trash2, ChevronLeft, ChevronRight, Edit3, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, ChevronLeft, ChevronRight, Edit3, ChevronDown, ChevronUp, X as XIcon } from 'lucide-react';
 import Badge from './Badge';
 import Button from './Button';
 import InterestModal from './InterestModal';
@@ -13,6 +13,7 @@ interface ItemCardProps {
   onUpdateStatus: (id: string, status: Item['status'], name?: string) => void;
   onDelete: (id: string) => void;
   onEdit: () => void;
+  onRemoveTaker?: (itemId: string, takerIndex: number) => void;
 }
 
 const ItemCard: React.FC<ItemCardProps> = ({ 
@@ -21,7 +22,8 @@ const ItemCard: React.FC<ItemCardProps> = ({
   onExpressInterest, 
   onUpdateStatus,
   onDelete,
-  onEdit
+  onEdit,
+  onRemoveTaker
 }) => {
   const [interestConfig, setInterestConfig] = useState<{ open: boolean; type: 'TAKE' | 'INTEREST' }>({ open: false, type: 'TAKE' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -217,14 +219,26 @@ const ItemCard: React.FC<ItemCardProps> = ({
                 {item.interestedParties.length > 0 ? (
                   <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                      {item.interestedParties.map((p, idx) => (
-                        <div key={idx} className="bg-stone-50 p-2.5 rounded-xl border border-stone-100">
+                        <div key={idx} className="bg-stone-50 p-2.5 rounded-xl border border-stone-100 group relative">
                           <div className="flex items-center justify-between mb-0.5">
                             <span className={`text-xs font-bold ${p.type === 'TAKE' ? 'text-indigo-600' : 'text-stone-600'}`}>
                               {p.name} {p.type === 'TAKE' ? '🙋‍♂️' : '💬'}
                             </span>
-                            <span className="text-[9px] text-stone-400 font-medium">
-                              {new Date(p.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] text-stone-400 font-medium">
+                                {new Date(p.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </span>
+                              {onRemoveTaker && (
+                                <button
+                                  onClick={() => onRemoveTaker(item.id, idx)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-rose-100 rounded text-rose-500 hover:text-rose-700"
+                                  aria-label="Remove from waitlist"
+                                  title="Remove from waitlist"
+                                >
+                                  <XIcon size={12} />
+                                </button>
+                              )}
+                            </div>
                           </div>
                           {p.question && (
                             <p className="text-[10px] text-stone-500 leading-tight italic">"{p.question}"</p>

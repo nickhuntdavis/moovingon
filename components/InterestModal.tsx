@@ -60,9 +60,12 @@ const InterestModal: React.FC<InterestModalProps> = ({ itemTitle, isOpen, type, 
               <CheckCircle className="w-8 h-8 text-emerald-600" />
             </div>
             <h3 className="text-2xl font-black text-stone-900 mb-2">Reserved for you!</h3>
-            <p className="text-stone-500 font-medium leading-relaxed mb-8">
+            <p className="text-stone-500 font-medium leading-relaxed mb-4">
               Nice one, {name}! I've put your name on it.<br />
               <span className="font-bold text-indigo-600">Now, send Nick a quick WhatsApp to arrange collection.</span>
+            </p>
+            <p className="text-xs text-stone-400 mb-6 text-center">
+              Nick's number: <a href="tel:+31618509055" className="font-bold text-stone-600 hover:text-indigo-600">+31 6 1850 9055</a>
             </p>
             
             <a 
