@@ -16,7 +16,10 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   
   const [viewMode, setViewMode] = useState<ViewMode>('FRIEND');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
+    // Check localStorage for persisted admin authentication
+    return localStorage.getItem('moovingon_admin_authenticated') === 'true';
+  });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -256,17 +259,17 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-stone-50 pb-24 font-sans text-stone-900">
+    <div className={`min-h-screen pb-24 font-sans ${viewMode === 'ADMIN' ? 'bg-stone-900 text-white' : 'bg-stone-50 text-stone-900'}`}>
       <main className="max-w-5xl mx-auto px-4 py-12 md:py-20">
         
         {/* Error Banner */}
         {error && (
-          <div className="mb-6 bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center gap-3">
-            <AlertCircle className="text-rose-600 flex-shrink-0" size={20} />
-            <p className="text-rose-800 text-sm font-medium">{error}</p>
+          <div className={`mb-6 rounded-2xl p-4 flex items-center gap-3 ${viewMode === 'ADMIN' ? 'bg-rose-900/50 border border-rose-700' : 'bg-rose-50 border border-rose-200'}`}>
+            <AlertCircle className={`flex-shrink-0 ${viewMode === 'ADMIN' ? 'text-rose-300' : 'text-rose-600'}`} size={20} />
+            <p className={`text-sm font-medium ${viewMode === 'ADMIN' ? 'text-rose-100' : 'text-rose-800'}`}>{error}</p>
             <button 
               onClick={() => setError(null)}
-              className="ml-auto text-rose-600 hover:text-rose-800"
+              className={`ml-auto ${viewMode === 'ADMIN' ? 'text-rose-300 hover:text-rose-100' : 'text-rose-600 hover:text-rose-800'}`}
             >
               ×
             </button>
@@ -276,7 +279,7 @@ export default function App() {
         {/* Loading State */}
         {isLoading && (
           <div className="text-center py-20">
-            <p className="text-stone-500 font-medium">Loading items...</p>
+            <p className={`font-medium ${viewMode === 'ADMIN' ? 'text-stone-300' : 'text-stone-500'}`}>Loading items...</p>
           </div>
         )}
 
@@ -376,13 +379,13 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-20 border-t border-stone-200 py-16 px-4 text-center">
-        <p className="text-stone-400 text-sm font-medium flex items-center justify-center gap-2">
+      <footer className={`mt-20 border-t py-16 px-4 text-center ${viewMode === 'ADMIN' ? 'border-stone-700' : 'border-stone-200'}`}>
+        <p className={`text-sm font-medium flex items-center justify-center gap-2 ${viewMode === 'ADMIN' ? 'text-stone-400' : 'text-stone-400'}`}>
           Made with <Heart size={14} className="text-rose-400 fill-rose-400" /> for Nick's friends.
         </p>
         <button 
           onClick={handleAdminAccess}
-          className="mt-8 text-[10px] text-stone-300 hover:text-stone-500 transition-colors uppercase tracking-[0.2em] font-black"
+          className={`mt-8 text-[10px] transition-colors uppercase tracking-[0.2em] font-black ${viewMode === 'ADMIN' ? 'text-stone-400 hover:text-stone-200' : 'text-stone-300 hover:text-stone-500'}`}
         >
           {isAdminAuthenticated ? 'Admin Panel Active' : 'Owner Login'}
         </button>
@@ -393,6 +396,8 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)} 
         onSuccess={() => {
           setIsAdminAuthenticated(true);
+          // Persist admin authentication in localStorage
+          localStorage.setItem('moovingon_admin_authenticated', 'true');
           setViewMode('ADMIN');
         }} 
       />

@@ -4,6 +4,7 @@ import { Trash2, ChevronLeft, ChevronRight, Edit3, ChevronDown, ChevronUp } from
 import Badge from './Badge';
 import Button from './Button';
 import InterestModal from './InterestModal';
+import ImageLightbox from './ImageLightbox';
 
 interface ItemCardProps {
   item: Item;
@@ -25,6 +26,7 @@ const ItemCard: React.FC<ItemCardProps> = ({
   const [interestConfig, setInterestConfig] = useState<{ open: boolean; type: 'TAKE' | 'INTEREST' }>({ open: false, type: 'TAKE' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   
   const isAvailable = item.status === 'AVAILABLE';
   const isReserved = item.status === 'RESERVED';
@@ -86,7 +88,7 @@ const ItemCard: React.FC<ItemCardProps> = ({
   return (
     <div className={`bg-white rounded-[2rem] shadow-sm border border-stone-200 overflow-hidden flex flex-col h-full transition-all duration-300 hover:shadow-2xl ${cardStyle}`}>
       {/* Visual Header / Gallery */}
-      <div className="relative aspect-square bg-stone-100 overflow-hidden group">
+      <div className="relative aspect-square bg-stone-100 overflow-hidden group cursor-pointer" onClick={() => item.images.length > 0 && setIsLightboxOpen(true)}>
         <img 
           src={item.images[currentImageIndex]} 
           alt={item.title} 
@@ -271,6 +273,14 @@ const ItemCard: React.FC<ItemCardProps> = ({
         type={interestConfig.type}
         onClose={() => setInterestConfig(prev => ({ ...prev, open: false }))}
         onConfirm={(name, question) => onExpressInterest(item.id, name, interestConfig.type, question)}
+      />
+
+      <ImageLightbox
+        images={item.images}
+        currentIndex={currentImageIndex}
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+        onNavigate={(index) => setCurrentImageIndex(index)}
       />
     </div>
   );

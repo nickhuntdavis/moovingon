@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, MessageCircle, ArrowRight } from 'lucide-react';
 import Button from './Button';
 
@@ -14,6 +14,15 @@ const InterestModal: React.FC<InterestModalProps> = ({ itemTitle, isOpen, type, 
   const [name, setName] = useState('');
   const [question, setQuestion] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setName('');
+      setQuestion('');
+      setSubmitted(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
