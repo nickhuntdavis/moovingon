@@ -410,30 +410,53 @@ class BaserowService {
     }
 
     // Collect interested parties from taker fields
-    // First check primary taker_name/taker_time (most recent/first person)
+    // Parse format: "Name, Taker" or "Name, Interested"
     const interestedParties: Interest[] = [];
     
-    // Primary taker (taker_name/taker_time) - this is the first/most recent person
+    // Helper to parse name and extract type
+    const parseTakerName = (formattedName: string): { name: string; type: 'TAKE' | 'INTEREST' } => {
+      if (!formattedName) return { name: '', type: 'TAKE' };
+      
+      // Check if it contains ", Taker" or ", Interested"
+      if (formattedName.includes(', Taker')) {
+        const name = formattedName.replace(', Taker', '').trim();
+        return { name, type: 'TAKE' };
+      } else if (formattedName.includes(', Interested')) {
+        const name = formattedName.replace(', Interested', '').trim();
+        return { name, type: 'INTEREST' };
+      }
+      
+      // Fallback: if no label, assume it's a taker (for backward compatibility)
+      return { name: formattedName.trim(), type: 'TAKE' };
+    };
+    
+    // Primary taker (taker_name/taker_time) - this is the first person
     const primaryTakerName = getField(BASEROW_COLUMN_MAPPING.taker_name);
     const primaryTakerTime = getField(BASEROW_COLUMN_MAPPING.taker_time);
     if (primaryTakerName) {
-      interestedParties.push({
-        name: primaryTakerName,
-        timestamp: primaryTakerTime ? new Date(primaryTakerTime).getTime() : Date.now(),
-        type: 'TAKE', // Primary taker is usually "TAKE" type
-      });
-    }
-    
-    // Additional takers (numbered fields)
-    for (let i = 1; i <= 4; i++) {
-      const name = getField(`taker_${i}_name`);
-      const time = getField(`taker_${i}_time`);
+      const { name, type } = parseTakerName(primaryTakerName);
       if (name) {
         interestedParties.push({
           name,
-          timestamp: time ? new Date(time).getTime() : Date.now(),
-          type: 'TAKE', // Assume taker fields are for "TAKE" type
+          timestamp: primaryTakerTime ? new Date(primaryTakerTime).getTime() : Date.now(),
+          type,
         });
+      }
+    }
+    
+    // Additional takers (numbered fields: taker_1_name, taker_2_name, etc.)
+    for (let i = 1; i <= 4; i++) {
+      const nameField = getField(`taker_${i}_name`);
+      const timeField = getField(`taker_${i}_time`);
+      if (nameField) {
+        const { name, type } = parseTakerName(nameField);
+        if (name) {
+          interestedParties.push({
+            name,
+            timestamp: timeField ? new Date(timeField).getTime() : Date.now(),
+            type,
+          });
+        }
       }
     }
 
@@ -584,20 +607,24 @@ class BaserowService {
     }
 
     // Split interested parties into taker fields
-    // First interested party goes to taker_name/taker_time (primary)
-    // Remaining parties go to numbered fields (taker_1_name, etc.)
+    // Format: "Name, Taker" or "Name, Interested" based on type
+    // Store in sequence: taker_name (first), then taker_1_name, taker_2_name, etc.
     
     if (item.interestedParties.length > 0) {
-      // Primary taker (first person) - most recent or first to express interest
+      // Primary taker (first person) - goes to taker_name/taker_time
       const primaryParty = item.interestedParties[0];
-      await setField(BASEROW_COLUMN_MAPPING.taker_name, primaryParty.name);
+      const primaryLabel = primaryParty.type === 'TAKE' ? 'Taker' : 'Interested';
+      const primaryNameFormatted = `${primaryParty.name}, ${primaryLabel}`;
+      await setField(BASEROW_COLUMN_MAPPING.taker_name, primaryNameFormatted);
       await setField(BASEROW_COLUMN_MAPPING.taker_time, new Date(primaryParty.timestamp).toISOString().split('T')[0]);
       
-      // Additional takers (if any) go to numbered fields
+      // Additional takers (if any) go to numbered fields (taker_1_name, taker_2_name, etc.)
       for (let i = 1; i <= 4; i++) {
         const party = item.interestedParties[i]; // Note: i, not i-1, since first is in primary
         if (party) {
-          await setField(`taker_${i}_name`, party.name);
+          const label = party.type === 'TAKE' ? 'Taker' : 'Interested';
+          const nameFormatted = `${party.name}, ${label}`;
+          await setField(`taker_${i}_name`, nameFormatted);
           await setField(`taker_${i}_time`, new Date(party.timestamp).toISOString().split('T')[0]);
         } else {
           // Clear unused taker fields
