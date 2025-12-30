@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Baserow Service</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .log {
+            background: #252526;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .info { color: #569cd6; }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1177bb; }
+    </style>
+</head>
+<body>
+    <h1>Test Baserow Service</h1>
+    <button onclick="testService()">Test getAllItems()</button>
+    <button onclick="clearLog()">Clear Log</button>
+    <div id="log" class="log"></div>
+
+    <script type="module">
+        // Override console.log to show in UI
+        const logDiv = document.getElementById('log');
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'warn' ? 'error' : 'success';
+            logDiv.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        console.log = (...args) => {
+            originalLog(...args);
+            addLog(args.join(' '), 'info');
+        };
+
+        console.error = (...args) => {
+            originalError(...args);
+            addLog(args.join(' '), 'error');
+        };
+
+        console.warn = (...args) => {
+            originalWarn(...args);
+            addLog(args.join(' '), 'warn');
+        };
+
+        window.clearLog = () => {
+            logDiv.innerHTML = '';
+        };
+
+        window.testService = async () => {
+            try {
+                // Import the service (this will only work if the module is set up correctly)
+                // For now, let's test the API directly
+                console.log('🧪 Testing Baserow API directly...');
+                
+                const TABLE_ID = '786250';
+                const TOKEN = 'laIQcMIWcsVRPguGkFaP2kG6nCsGRIob';
+                
+                // Test 1: Fetch fields
+                console.log('📋 Step 1: Fetching field definitions...');
+                const fieldsResponse = await fetch(
+                    `https://api.baserow.io/api/database/fields/table/${TABLE_ID}/`,
+                    {
+                        headers: { 'Authorization': `Token ${TOKEN}` }
+                    }
+                );
+                
+                if (!fieldsResponse.ok) {
+                    const error = await fieldsResponse.text();
+                    throw new Error(`Fields fetch failed: ${fieldsResponse.status} - ${error}`);
+                }
+                
+                const fields = await fieldsResponse.json();
+                console.log(`✅ Loaded ${fields.length} fields`);
+                fields.forEach(f => console.log(`  - ${f.name} (${f.type})`));
+                
+                // Test 2: Fetch rows
+                console.log('\n📥 Step 2: Fetching rows...');
+                const rowsResponse = await fetch(
+                    `https://api.baserow.io/api/database/rows/table/${TABLE_ID}/?size=5`,
+                    {
+                        headers: { 'Authorization': `Token ${TOKEN}` }
+                    }
+                );
+                
+                if (!rowsResponse.ok) {
+                    const error = await rowsResponse.text();
+                    throw new Error(`Rows fetch failed: ${rowsResponse.status} - ${error}`);
+                }
+                
+                const rowsData = await rowsResponse.json();
+                console.log(`✅ Fetched ${rowsData.results.length} rows`);
+                
+                // Test 3: Convert first row
+                if (rowsData.results.length > 0) {
+                    console.log('\n🔄 Step 3: Converting first row...');
+                    const row = rowsData.results[0];
+                    console.log('Raw row keys:', Object.keys(row));
+                    
+                    const converted = {};
+                    for (const [key, value] of Object.entries(row)) {
+                        if (key.startsWith('field_')) {
+                            const fieldId = parseInt(key.replace('field_', ''));
+                            const field = fields.find(f => f.id === fieldId);
+                            if (field) {
+                                converted[field.name] = value;
+                                console.log(`  ${key} → ${field.name}: ${JSON.stringify(value)}`);
+                            }
+                        } else {
+                            converted[key] = value;
+                        }
+                    }
+                    
+                    console.log('\n✅ Converted row:');
+                    console.log(JSON.stringify(converted, null, 2));
+                }
+                
+            } catch (error) {
+                console.error('❌ Test failed:', error.message);
+            }
+        };
+    </script>
+</body>
+</html>
+

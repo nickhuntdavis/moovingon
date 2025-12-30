@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baserow Access Diagnostic</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 { color: #1f2937; }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border-left: 4px solid #6366f1;
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 5px;
+        }
+        button:hover { background: #4f46e5; }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success { background: #d1fae5; border: 1px solid #10b981; color: #065f46; }
+        .error { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+        .info { background: #dbeafe; border: 1px solid #3b82f6; color: #1e40af; }
+        .warning { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; }
+        .step { margin: 15px 0; padding: 15px; background: white; border-radius: 6px; }
+        .step h3 { margin-top: 0; color: #374151; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Baserow Access Diagnostic Tool</h1>
+        <p>This tool will help diagnose why you're getting "ERROR_USER_NOT_IN_GROUP"</p>
+
+        <div class="test-section">
+            <h2>Step 1: Test Token Validity</h2>
+            <p>Check if your token is valid and can authenticate.</p>
+            <button onclick="testToken()">Test Token</button>
+            <div id="token-result" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Step 2: List Your Workspaces</h2>
+            <p>See which workspaces your token has access to.</p>
+            <button onclick="listWorkspaces()">List Workspaces</button>
+            <div id="workspace-result" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Step 3: Test Table Access</h2>
+            <p>Try to access the specific table (this is where the error occurs).</p>
+            <button onclick="testTableAccess()">Test Table Access</button>
+            <div id="table-result" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Step 4: Find Correct Table ID</h2>
+            <p>If table access fails, try to find tables in your workspaces.</p>
+            <button onclick="findTables()">Find Tables</button>
+            <div id="tables-result" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📋 How to Fix "ERROR_USER_NOT_IN_GROUP"</h2>
+            <div class="step">
+                <h3>Option 1: Add Token to Workspace (Recommended)</h3>
+                <ol>
+                    <li>Go to your Baserow workspace</li>
+                    <li>Click on the workspace settings (gear icon)</li>
+                    <li>Go to "API tokens" or "Members" section</li>
+                    <li>Add your token to the workspace, OR</li>
+                    <li>Create a new token that has access to this workspace</li>
+                </ol>
+            </div>
+            <div class="step">
+                <h3>Option 2: Create a New Token with Workspace Access</h3>
+                <ol>
+                    <li>In Baserow, go to your user settings</li>
+                    <li>Navigate to "API tokens"</li>
+                    <li>Create a new token</li>
+                    <li>Make sure it has access to the workspace containing table "MoovingOn 345196"</li>
+                    <li>Update the token in <code>services/baserow.ts</code></li>
+                </ol>
+            </div>
+            <div class="step">
+                <h3>Option 3: Verify Table ID</h3>
+                <ol>
+                    <li>The table ID might be incorrect</li>
+                    <li>Use "Find Tables" above to see actual table IDs</li>
+                    <li>Update <code>TABLE_ID = '345196'</code> in <code>services/baserow.ts</code> if needed</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASEROW_API_URL = 'https://api.baserow.io/api';
+        const BASEROW_TOKEN = 'laIQcMIWcsVRPguGkFaP2kG6nCsGRIob';
+        const TABLE_ID = '786250';
+
+        async function apiRequest(endpoint, options = {}) {
+            const url = `${BASEROW_API_URL}${endpoint}`;
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Authorization': `Token ${BASEROW_TOKEN}`,
+                        'Content-Type': 'application/json',
+                        ...options.headers,
+                    },
+                });
+
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    data = text;
+                }
+
+                return { ok: response.ok, status: response.status, data };
+            } catch (error) {
+                return { ok: false, error: error.message };
+            }
+        }
+
+        window.testToken = async function() {
+            const resultDiv = document.getElementById('token-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.textContent = 'Testing token...';
+
+            // Test token by trying to access workspaces (more reliable endpoint)
+            const result = await apiRequest('/workspaces/');
+            if (result.ok) {
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `✅ Token is valid!\n\nFound ${result.data.length} workspace(s) accessible with this token.\n\nWorkspaces: ${JSON.stringify(result.data.map(w => w.name), null, 2)}`;
+            } else {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Token test failed.\n\nStatus: ${result.status}\nError: ${JSON.stringify(result.data, null, 2)}\n\nNote: This might be a permissions issue, not necessarily an invalid token.`;
+            }
+        };
+
+        window.listWorkspaces = async function() {
+            const resultDiv = document.getElementById('workspace-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.textContent = 'Fetching workspaces...';
+
+            const result = await apiRequest('/workspaces/');
+            if (result.ok) {
+                const workspaces = result.data;
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `✅ Found ${workspaces.length} workspace(s):\n\n${JSON.stringify(workspaces, null, 2)}`;
+            } else {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Failed to fetch workspaces.\n\nError: ${JSON.stringify(result.data, null, 2)}`;
+            }
+        };
+
+        window.testTableAccess = async function() {
+            const resultDiv = document.getElementById('table-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.textContent = 'Testing table access...';
+
+            const result = await apiRequest(`/database/rows/table/${TABLE_ID}/?size=1`);
+            if (result.ok) {
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `✅ Table access successful!\n\nFound ${result.data.count} row(s).\n\nSample: ${JSON.stringify(result.data.results[0] || 'No rows', null, 2)}`;
+            } else {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Table access failed (ERROR_USER_NOT_IN_GROUP)\n\nStatus: ${result.status}\nError: ${JSON.stringify(result.data, null, 2)}\n\nThis means your token doesn't have access to the workspace containing this table.`;
+            }
+        };
+
+        window.findTables = async function() {
+            const resultDiv = document.getElementById('tables-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.textContent = 'Finding tables in your workspaces...';
+
+            try {
+                // First get workspaces
+                const workspacesResult = await apiRequest('/workspaces/');
+                if (!workspacesResult.ok) {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Cannot fetch workspaces: ${JSON.stringify(workspacesResult.data, null, 2)}`;
+                    return;
+                }
+
+                const workspaces = workspacesResult.data;
+                let allTables = [];
+
+                for (const workspace of workspaces) {
+                    // Get databases in workspace
+                    const databasesResult = await apiRequest(`/workspaces/${workspace.id}/applications/`);
+                    if (databasesResult.ok) {
+                        const databases = databasesResult.data;
+                        for (const db of databases) {
+                            if (db.type === 'database') {
+                                // Get tables in database
+                                const tablesResult = await apiRequest(`/database/tables/database/${db.id}/`);
+                                if (tablesResult.ok) {
+                                    const tables = tablesResult.data;
+                                    allTables.push(...tables.map(t => ({
+                                        ...t,
+                                        workspace: workspace.name,
+                                        database: db.name
+                                    })));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                resultDiv.className = allTables.length > 0 ? 'result success' : 'result warning';
+                if (allTables.length > 0) {
+                    resultDiv.textContent = `✅ Found ${allTables.length} table(s):\n\n${allTables.map(t => 
+                        `Workspace: ${t.workspace}\nDatabase: ${t.database}\nTable: ${t.name}\nID: ${t.id}\n---`
+                    ).join('\n\n')}\n\nLook for "MoovingOn" or table ID ${TABLE_ID}`;
+                } else {
+                    resultDiv.textContent = `⚠️ No tables found. Make sure your token has access to workspaces.`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        };
+    </script>
+</body>
+</html>
+

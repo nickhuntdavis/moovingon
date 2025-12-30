@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baserow Table Columns</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 { color: #1f2937; }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 10px 5px;
+        }
+        button:hover { background: #4f46e5; }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+        }
+        .column {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #6366f1;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .column h3 {
+            margin: 0 0 10px 0;
+            color: #1f2937;
+            font-size: 18px;
+        }
+        .column-detail {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 10px;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .label {
+            font-weight: 600;
+            color: #6b7280;
+        }
+        .value {
+            color: #1f2937;
+            font-family: monospace;
+        }
+        .sample-row {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fef3c7;
+            border-radius: 8px;
+            border: 1px solid #f59e0b;
+        }
+        .sample-row h3 {
+            margin-top: 0;
+            color: #92400e;
+        }
+        pre {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .mapping-suggestion {
+            margin-top: 30px;
+            padding: 20px;
+            background: #dbeafe;
+            border-radius: 8px;
+            border: 2px solid #3b82f6;
+        }
+        .mapping-suggestion h3 {
+            margin-top: 0;
+            color: #1e40af;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Baserow Table Columns</h1>
+        <p>Click the button below to fetch all columns/fields from your Baserow table.</p>
+        
+        <button onclick="fetchColumns()">Fetch Columns</button>
+        <button onclick="fetchSampleRow()">Fetch Sample Row</button>
+        <button onclick="fetchBoth()">Fetch Both</button>
+
+        <div id="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const BASEROW_API_URL = 'https://api.baserow.io/api';
+        const BASEROW_TOKEN = 'laIQcMIWcsVRPguGkFaP2kG6nCsGRIob';
+        const TABLE_ID = '786250';
+
+        async function apiRequest(endpoint, options = {}) {
+            const url = `${BASEROW_API_URL}${endpoint}`;
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Authorization': `Token ${BASEROW_TOKEN}`,
+                        'Content-Type': 'application/json',
+                        ...options.headers,
+                    },
+                });
+
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    data = text;
+                }
+
+                return { ok: response.ok, status: response.status, data };
+            } catch (error) {
+                return { ok: false, error: error.message };
+            }
+        }
+
+        window.fetchColumns = async function() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p>Fetching columns...</p>';
+
+            const result = await apiRequest(`/database/fields/table/${TABLE_ID}/`);
+            
+            if (result.ok && Array.isArray(result.data)) {
+                const fields = result.data;
+                let html = `<h2>Found ${fields.length} Column(s)</h2>`;
+                
+                fields.forEach((field, index) => {
+                    html += `
+                        <div class="column">
+                            <h3>${index + 1}. ${field.name}</h3>
+                            <div class="column-detail">
+                                <span class="label">Field ID:</span>
+                                <span class="value">${field.id}</span>
+                            </div>
+                            <div class="column-detail">
+                                <span class="label">Type:</span>
+                                <span class="value">${field.type}</span>
+                            </div>
+                    `;
+                    
+                    // Add type-specific details
+                    if (field.type === 'single_select' || field.type === 'multiple_select') {
+                        html += `
+                            <div class="column-detail">
+                                <span class="label">Options:</span>
+                                <span class="value">${JSON.stringify(field.select_options || [])}</span>
+                            </div>
+                        `;
+                    }
+                    
+                    if (field.type === 'file') {
+                        html += `
+                            <div class="column-detail">
+                                <span class="label">File Type:</span>
+                                <span class="value">${field.file_type || 'N/A'}</span>
+                            </div>
+                        `;
+                    }
+                    
+                    html += `</div>`;
+                });
+                
+                // Add mapping suggestion
+                html += generateMappingSuggestion(fields);
+                
+                resultDiv.innerHTML = html;
+            } else {
+                resultDiv.innerHTML = `<p style="color: red;">❌ Error: ${JSON.stringify(result.data, null, 2)}</p>`;
+            }
+        };
+
+        window.fetchSampleRow = async function() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            
+            const result = await apiRequest(`/database/rows/table/${TABLE_ID}/?size=1`);
+            
+            if (result.ok && result.data.results && result.data.results.length > 0) {
+                const row = result.data.results[0];
+                const columns = Object.keys(row);
+                
+                let html = `
+                    <div class="sample-row">
+                        <h3>Sample Row Data</h3>
+                        <p>This shows the actual field names as they appear in API responses:</p>
+                        <pre>${JSON.stringify(row, null, 2)}</pre>
+                        <h4>Column Names (for mapping):</h4>
+                        <ul>
+                            ${columns.map(col => `<li><code>${col}</code></li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+                
+                resultDiv.innerHTML = html;
+            } else {
+                resultDiv.innerHTML = `<p style="color: orange;">⚠️ No rows found in table, or error: ${JSON.stringify(result.data, null, 2)}</p>`;
+            }
+        };
+
+        window.fetchBoth = async function() {
+            await fetchColumns();
+            await fetchSampleRow();
+        };
+
+        function generateMappingSuggestion(fields) {
+            // Common field name mappings
+            const suggestions = {
+                'title': ['title', 'name', 'item name', 'item_name'],
+                'description': ['description', 'desc', 'details', 'notes'],
+                'price': ['price', 'cost', 'amount'],
+                'condition': ['condition', 'state', 'quality'],
+                'status': ['status', 'state', 'availability'],
+                'images': ['images', 'image', 'photos', 'pictures', 'media'],
+                'interestedParties': ['interested parties', 'interestedparties', 'waitlist', 'interests'],
+                'createdAt': ['created_at', 'created at', 'date created', 'created']
+            };
+
+            let html = `
+                <div class="mapping-suggestion">
+                    <h3>📝 Suggested Column Mapping</h3>
+                    <p>Update <code>config/baserow-mapping.ts</code> with these values:</p>
+                    <pre>export const BASEROW_COLUMN_MAPPING = {
+  id: 'id',
+`;
+
+            // Try to match fields to our expected columns
+            Object.keys(suggestions).forEach(key => {
+                const possibleNames = suggestions[key];
+                const found = fields.find(f => 
+                    possibleNames.some(name => 
+                        f.name.toLowerCase().replace(/\s+/g, '') === name.toLowerCase().replace(/\s+/g, '')
+                    )
+                );
+                
+                if (found) {
+                    html += `  ${key}: '${found.name}', // Found: ${found.type}\n`;
+                } else {
+                    html += `  ${key}: '???', // NOT FOUND - check field names above\n`;
+                }
+            });
+
+            html += `};</pre>`;
+            html += `<p><strong>Note:</strong> Field names are case-sensitive and must match exactly (including spaces).</p>`;
+            html += `</div>`;
+
+            return html;
+        }
+    </script>
+</body>
+</html>
+

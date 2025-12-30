@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backfill Test Row to Baserow</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 { color: #1f2937; }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 10px 5px;
+        }
+        button:hover { background: #4f46e5; }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d1fae5;
+            border: 2px solid #10b981;
+            color: #065f46;
+        }
+        .error {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+        }
+        .info {
+            background: #dbeafe;
+            border: 2px solid #3b82f6;
+            color: #1e40af;
+        }
+        .preview {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #6366f1;
+        }
+        .preview h3 {
+            margin-top: 0;
+            color: #374151;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Backfill Test Row to Baserow</h1>
+        <p>This will create a complete test row with all fields populated.</p>
+
+        <div class="preview">
+            <h3>Test Data Preview:</h3>
+            <ul>
+                <li><strong>Name:</strong> Test Vintage Chair</li>
+                <li><strong>Description:</strong> A beautiful test item with rich HTML description</li>
+                <li><strong>Price:</strong> €45</li>
+                <li><strong>Condition:</strong> Good as new</li>
+                <li><strong>Status:</strong> Reserved</li>
+                <li><strong>Primary Taker:</strong> Sarah Johnson (with timestamp)</li>
+                <li><strong>Additional Takers:</strong> Mike Smith, Emma Davis</li>
+            </ul>
+        </div>
+
+        <button onclick="createTestRow()" id="create-btn">Create Test Row</button>
+        <button onclick="clearResult()">Clear</button>
+
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const BASEROW_API_URL = 'https://api.baserow.io/api/database/rows/table';
+        const BASEROW_TOKEN = 'laIQcMIWcsVRPguGkFaP2kG6nCsGRIob';
+        const TABLE_ID = '786250';
+
+        // Field IDs (from your table structure)
+        const FIELD_IDS = {
+            Name: 6697990,
+            price: 6697991,
+            condition: 6697992,
+            description: 6698012,
+            image_1: 6698029,
+            image_2: 6698030,
+            image_3: 6698031,
+            image_4: 6698032,
+            status: 6698033,
+            taker_name: 6698034,
+            taker_time: 6698037,
+            taker_1_name: 6698040,
+            taker_1_time: 6698041,
+            taker_2_name: 6698042,
+            taker_2_time: 6698043,
+            taker_3_name: 6698044,
+            taker_3_time: 6698045,
+        };
+
+        async function request(endpoint, options = {}) {
+            const url = `${BASEROW_API_URL}/${TABLE_ID}${endpoint}`;
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    'Authorization': `Token ${BASEROW_TOKEN}`,
+                    'Content-Type': 'application/json',
+                    ...options.headers,
+                },
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            return await response.json();
+        }
+
+        window.createTestRow = async function() {
+            const resultDiv = document.getElementById('result');
+            const createBtn = document.getElementById('create-btn');
+            
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            createBtn.disabled = true;
+            
+            let log = '🚀 Creating test row...\n\n';
+            resultDiv.textContent = log;
+
+            try {
+                // Create test data with all fields
+                const testRow = {
+                    [`field_${FIELD_IDS.Name}`]: 'Test Vintage Chair',
+                    [`field_${FIELD_IDS.description}`]: '<p>A beautiful <strong>test item</strong> with rich HTML description.</p><ul><li>Great condition</li><li>Ready to go</li><li>Perfect for testing</li></ul>',
+                    [`field_${FIELD_IDS.price}`]: 45,
+                    [`field_${FIELD_IDS.condition}`]: 'Good as new',
+                    [`field_${FIELD_IDS.status}`]: 'Reserved',
+                    
+                    // Primary taker (first person who expressed interest)
+                    [`field_${FIELD_IDS.taker_name}`]: 'Sarah Johnson',
+                    [`field_${FIELD_IDS.taker_time}`]: new Date().toISOString().split('T')[0], // Today's date
+                    
+                    // Additional takers
+                    [`field_${FIELD_IDS.taker_1_name}`]: 'Mike Smith',
+                    [`field_${FIELD_IDS.taker_1_time}`]: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+                    
+                    [`field_${FIELD_IDS.taker_2_name}`]: 'Emma Davis',
+                    [`field_${FIELD_IDS.taker_2_time}`]: new Date(Date.now() - 172800000).toISOString().split('T')[0], // 2 days ago
+                    
+                    // Clear unused taker fields
+                    [`field_${FIELD_IDS.taker_3_name}`]: null,
+                    [`field_${FIELD_IDS.taker_3_time}`]: null,
+                    [`field_${FIELD_IDS.taker_4_name}`]: null,
+                    [`field_${FIELD_IDS.taker_4_time}`]: null,
+                    
+                    // Image fields - file fields, so we'll leave them empty (null)
+                    // Note: To add images, you'd need to upload files first via Baserow's file upload API
+                    [`field_${FIELD_IDS.image_1}`]: null,
+                    [`field_${FIELD_IDS.image_2}`]: null,
+                    [`field_${FIELD_IDS.image_3}`]: null,
+                    [`field_${FIELD_IDS.image_4}`]: null,
+                };
+
+                log += '📋 Test row data:\n';
+                log += JSON.stringify(testRow, null, 2) + '\n\n';
+                resultDiv.textContent = log;
+
+                log += '📤 Sending to Baserow...\n';
+                resultDiv.textContent = log;
+
+                const created = await request('/', {
+                    method: 'POST',
+                    body: JSON.stringify(testRow),
+                });
+
+                log += '\n✅ Successfully created test row!\n\n';
+                log += 'Created row:\n';
+                log += JSON.stringify(created, null, 2);
+                
+                resultDiv.className = 'result success';
+                resultDiv.textContent = log;
+
+            } catch (error) {
+                log += `\n❌ Error: ${error.message}\n`;
+                resultDiv.className = 'result error';
+                resultDiv.textContent = log;
+            } finally {
+                createBtn.disabled = false;
+            }
+        };
+
+        window.clearResult = function() {
+            document.getElementById('result').style.display = 'none';
+        };
+    </script>
+</body>
+</html>
+

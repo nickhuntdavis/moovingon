@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Baserow Connection</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button:hover {
+            background: #4f46e5;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+        .error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+        .info {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Baserow Connection Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Test Table Access</h2>
+        <p>This will try to fetch rows from your Baserow table.</p>
+        <button onclick="testTableAccess()">Test Table Access</button>
+        <div id="table-result" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Test Column Structure</h2>
+        <p>This will fetch a sample row to see the column structure.</p>
+        <button onclick="testColumnStructure()">Check Columns</button>
+        <div id="column-result" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Test Create Item</h2>
+        <p>This will create a test item in your Baserow table.</p>
+        <button onclick="testCreateItem()">Create Test Item</button>
+        <div id="create-result" class="result" style="display:none;"></div>
+    </div>
+
+    <script>
+        const BASEROW_API_URL = 'https://api.baserow.io/api/database/rows/table';
+        const BASEROW_TOKEN = 'laIQcMIWcsVRPguGkFaP2kG6nCsGRIob';
+        const TABLE_ID = '345196';
+
+        async function request(endpoint, options = {}) {
+            const url = `${BASEROW_API_URL}/${TABLE_ID}${endpoint}`;
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Authorization': `Token ${BASEROW_TOKEN}`,
+                        'Content-Type': 'application/json',
+                        ...options.headers,
+                    },
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        async function testTableAccess() {
+            const resultDiv = document.getElementById('table-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.textContent = 'Testing...';
+
+            try {
+                const data = await request('/?size=5');
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `✅ Success! Found ${data.count} total rows.\n\nFirst ${data.results.length} rows:\n${JSON.stringify(data.results, null, 2)}`;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function testColumnStructure() {
+            const resultDiv = document.getElementById('column-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.textContent = 'Fetching column structure...';
+
+            try {
+                const data = await request('/?size=1');
+                if (data.results && data.results.length > 0) {
+                    const row = data.results[0];
+                    const columns = Object.keys(row).filter(k => k !== 'id');
+                    
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Found columns:\n\n${columns.map(c => `- ${c}`).join('\n')}\n\nSample row structure:\n${JSON.stringify(row, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result info';
+                    resultDiv.textContent = '⚠️ Table is empty. No columns to analyze.';
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function testCreateItem() {
+            const resultDiv = document.getElementById('create-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.textContent = 'Creating test item...';
+
+            try {
+                const testItem = {
+                    title: 'Test Item ' + new Date().toLocaleTimeString(),
+                    description: 'This is a test item created from the connection test',
+                    price: 99,
+                    condition: 'Good as new',
+                    status: 'AVAILABLE',
+                    images: JSON.stringify(['https://via.placeholder.com/400']),
+                    interestedParties: JSON.stringify([]),
+                    created_at: new Date().toISOString(),
+                };
+
+                const created = await request('/', {
+                    method: 'POST',
+                    body: JSON.stringify(testItem),
+                });
+
+                resultDiv.className = 'result success';
+                resultDiv.textContent = `✅ Test item created successfully!\n\nCreated item:\n${JSON.stringify(created, null, 2)}`;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error: ${error.message}\n\nNote: Column names might not match. Check the error details above.`;
+            }
+        }
+    </script>
+</body>
+</html>
+

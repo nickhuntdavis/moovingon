@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migrate Local Data to Baserow</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 30px;
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #4f46e5;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .success {
+            background: #d1fae5;
+            border: 2px solid #10b981;
+            color: #065f46;
+        }
+        .error {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+        }
+        .info {
+            background: #dbeafe;
+            border: 2px solid #3b82f6;
+            color: #1e40af;
+        }
+        .item-list {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        .item-list h3 {
+            margin-top: 0;
+            color: #374151;
+        }
+        .item {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+            border-left: 3px solid #6366f1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Migrate Local Data to Baserow</h1>
+        <p class="subtitle">This will upload all items from localStorage to your Baserow table</p>
+
+        <div class="item-list" id="item-list" style="display: none;">
+            <h3>Items to migrate:</h3>
+            <div id="items-preview"></div>
+        </div>
+
+        <button onclick="loadLocalData()">1. Load Local Data</button>
+        <button onclick="migrateToBaserow()" id="migrate-btn" disabled>2. Migrate to Baserow</button>
+        <button onclick="clearResults()">Clear Results</button>
+
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script type="module">
+        const BASEROW_API_URL = 'https://api.baserow.io/api/database/rows/table';
+        const BASEROW_TOKEN = 'laIQcMIWcsVRPguGkFaP2kG6nCsGRIob';
+        const TABLE_ID = '786250';
+        const STORAGE_KEY = 'moving_on_sale_items';
+
+        let localItems = [];
+
+        window.loadLocalData = function() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.textContent = 'Loading local data...';
+
+            try {
+                // Try to get from localStorage
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    localItems = JSON.parse(saved);
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ Found ${localItems.length} items in localStorage:\n\n${localItems.map((item, i) => `${i + 1}. ${item.title} (${item.status})`).join('\n')}`;
+                } else {
+                    // Fallback to initial items (hardcoded)
+                    localItems = [
+                        {
+                            id: '1',
+                            title: 'Mid-Century Armchair',
+                            description: 'Super comfortable, original upholstery. Needs to go by Friday.',
+                            price: 0,
+                            condition: 'Good as new',
+                            status: 'AVAILABLE',
+                            images: ['https://images.unsplash.com/photo-1592078615290-033ee584e267?auto=format&fit=crop&q=80&w=800'],
+                            interestedParties: [],
+                            createdAt: Date.now()
+                        },
+                        {
+                            id: '2',
+                            title: 'Monstera Deliciosa',
+                            description: 'Includes the terracotta pot. She is heavy!',
+                            price: 25,
+                            condition: 'Like New',
+                            status: 'RESERVED',
+                            images: ['https://images.unsplash.com/photo-1614594975525-e45190c55d0b?auto=format&fit=crop&q=80&w=800'],
+                            interestedParties: [{ name: 'Sarah', timestamp: Date.now() - 10000, type: 'INTEREST' }],
+                            createdAt: Date.now() - 50000
+                        },
+                        {
+                            id: '3',
+                            title: 'Vintage Record Player',
+                            description: 'Works perfectly. Includes a few jazz records.',
+                            price: 80,
+                            condition: 'Good as new',
+                            status: 'AVAILABLE',
+                            images: ['https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&q=80&w=800'],
+                            interestedParties: [{ name: 'Mike', timestamp: Date.now() - 20000, type: 'INTEREST' }],
+                            createdAt: Date.now() - 100000
+                        }
+                    ];
+                    resultDiv.className = 'result info';
+                    resultDiv.textContent = `⚠️ No localStorage data found. Using ${localItems.length} initial items:\n\n${localItems.map((item, i) => `${i + 1}. ${item.title} (${item.status})`).join('\n')}`;
+                }
+
+                // Show item list
+                const itemList = document.getElementById('item-list');
+                const itemsPreview = document.getElementById('items-preview');
+                itemList.style.display = 'block';
+                itemsPreview.innerHTML = localItems.map(item => 
+                    `<div class="item"><strong>${item.title}</strong> - €${item.price} - ${item.status}</div>`
+                ).join('');
+
+                // Enable migrate button
+                document.getElementById('migrate-btn').disabled = false;
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Error loading local data: ${error.message}`;
+            }
+        };
+
+        async function request(endpoint, options = {}) {
+            const url = `${BASEROW_API_URL}/${TABLE_ID}${endpoint}`;
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    'Authorization': `Token ${BASEROW_TOKEN}`,
+                    'Content-Type': 'application/json',
+                    ...options.headers,
+                },
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            return await response.json();
+        }
+
+        window.migrateToBaserow = async function() {
+            if (localItems.length === 0) {
+                alert('Please load local data first!');
+                return;
+            }
+
+            const resultDiv = document.getElementById('result');
+            const migrateBtn = document.getElementById('migrate-btn');
+            
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            migrateBtn.disabled = true;
+            
+            let log = '🚀 Starting migration...\n\n';
+            resultDiv.textContent = log;
+
+            const results = {
+                success: 0,
+                failed: 0,
+                errors: [],
+            };
+
+            for (let i = 0; i < localItems.length; i++) {
+                const item = localItems[i];
+                log += `[${i + 1}/${localItems.length}] Migrating: "${item.title}"...\n`;
+                resultDiv.textContent = log;
+
+                try {
+                    // Prepare item data (remove id, createdAt - Baserow will generate)
+                    const { id, createdAt, interestedParties, ...itemData } = item;
+                    
+                    const rowData = {
+                        title: itemData.title,
+                        description: itemData.description || '',
+                        price: itemData.price,
+                        condition: itemData.condition,
+                        status: itemData.status,
+                        images: JSON.stringify(itemData.images || []),
+                        interestedParties: JSON.stringify(interestedParties || []),
+                        created_at: new Date(createdAt || Date.now()).toISOString(),
+                    };
+
+                    const created = await request('/', {
+                        method: 'POST',
+                        body: JSON.stringify(rowData),
+                    });
+
+                    log += `  ✅ Success! Created with ID: ${created.id}\n`;
+                    results.success++;
+                } catch (error) {
+                    const errorMsg = error.message || String(error);
+                    log += `  ❌ Failed: ${errorMsg}\n`;
+                    results.failed++;
+                    results.errors.push(`${item.title}: ${errorMsg}`);
+                }
+
+                resultDiv.textContent = log;
+                resultDiv.scrollTop = resultDiv.scrollHeight;
+
+                // Small delay to avoid rate limiting
+                if (i < localItems.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+
+            log += '\n' + '='.repeat(50) + '\n';
+            log += '📊 Migration Summary:\n';
+            log += `  ✅ Successfully migrated: ${results.success}\n`;
+            log += `  ❌ Failed: ${results.failed}\n`;
+            
+            if (results.errors.length > 0) {
+                log += '\nErrors:\n';
+                results.errors.forEach(err => log += `  - ${err}\n`);
+            }
+            log += '='.repeat(50);
+
+            resultDiv.textContent = log;
+            resultDiv.className = results.failed === 0 ? 'result success' : 'result error';
+            migrateBtn.disabled = false;
+        };
+
+        window.clearResults = function() {
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('item-list').style.display = 'none';
+            document.getElementById('migrate-btn').disabled = true;
+            localItems = [];
+        };
+
+        // Auto-load on page load
+        window.addEventListener('load', () => {
+            console.log('Migration tool ready. Click "Load Local Data" to start.');
+        });
+    </script>
+</body>
+</html>
+
