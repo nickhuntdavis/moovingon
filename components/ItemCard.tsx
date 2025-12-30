@@ -38,7 +38,7 @@ const ItemCard: React.FC<ItemCardProps> = ({
     if (item.images.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentImageIndex(prev => (prev + 1) % item.images.length);
-    }, 4000);
+    }, 8000); // Slowed down from 4000ms to 8000ms (8 seconds)
     return () => clearInterval(timer);
   }, [item.images.length]);
 

@@ -405,8 +405,8 @@ export default function App() {
         )}
       </main>
 
-      {/* FAQ Section */}
-      <FAQ viewMode={viewMode} />
+      {/* FAQ Section - Only show in friend view */}
+      {viewMode === 'FRIEND' && <FAQ viewMode={viewMode} />}
 
       {/* Footer */}
       <footer className={`mt-20 border-t py-16 px-4 text-center ${viewMode === 'ADMIN' ? 'border-stone-700' : 'border-stone-200'}`}>
