@@ -29,6 +29,7 @@ const ItemCard: React.FC<ItemCardProps> = ({
 }) => {
   const [interestConfig, setInterestConfig] = useState<{ open: boolean; type: 'TAKE' | 'INTEREST' }>({ open: false, type: 'TAKE' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [nextImageIndex, setNextImageIndex] = useState<number | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -42,25 +43,20 @@ const ItemCard: React.FC<ItemCardProps> = ({
   const isReserved = item.status === 'RESERVED';
   const isTaken = item.status === 'TAKEN';
   
-  // Get item index for staggered animation (using prime numbers: 2, 3, 5, 7 seconds)
-  const primeDelays = [2, 3, 5, 7];
-  const itemIndexRef = useRef<number>(Math.floor(Math.random() * 1000)); // Random index for stagger
-  const animationDelay = primeDelays[itemIndexRef.current % primeDelays.length] * 1000;
-
   useEffect(() => {
     if (item.images.length <= 1) return;
-    // Stagger animation start with prime number delay
-    let intervalId: NodeJS.Timeout | null = null;
-    const startTimer = setTimeout(() => {
-      intervalId = setInterval(() => {
-        setCurrentImageIndex(prev => (prev + 1) % item.images.length);
-      }, 20000); // Slowed down significantly to 20 seconds for less jarring transitions
-    }, animationDelay);
-    return () => {
-      clearTimeout(startTimer);
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [item.images.length, animationDelay]);
+    // Start animation immediately (no delay)
+    const intervalId = setInterval(() => {
+      const next = (currentImageIndex + 1) % item.images.length;
+      setNextImageIndex(next);
+      // After fade transition completes, update current index
+      setTimeout(() => {
+        setCurrentImageIndex(next);
+        setNextImageIndex(null);
+      }, 3000); // Match transition duration
+    }, 20000); // 20 seconds between image changes
+    return () => clearInterval(intervalId);
+  }, [item.images.length, currentImageIndex]);
 
   // Touch handlers for mobile swipe
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -143,13 +139,24 @@ const ItemCard: React.FC<ItemCardProps> = ({
   const renderCollapsed = (html: string) => {
     if (!html) return null;
     const text = stripHtml(html);
-    return <p className="line-clamp-4 text-stone-500 leading-relaxed font-medium">{text}</p>;
+    return <p className="line-clamp-5 text-stone-500 leading-relaxed font-medium">{text}</p>;
   };
 
   const hasMore = (html: string) => {
     if (!html) return false;
-    // Heuristic: if there's HTML formatting or it's long, show "Click for more"
-    return html.includes('<') || html.length > 150;
+    const text = stripHtml(html);
+    if (!text.trim()) return false;
+    
+    // Estimate if text would exceed 5 lines
+    // For text-sm with leading-relaxed, typical line width is ~60-70 characters
+    // With line-clamp-5, we want to check if text exceeds ~350 characters (5 lines * 70 chars)
+    // But we also need to account for word wrapping, so we'll use a more conservative estimate
+    // Count actual line breaks and estimate based on character count
+    const lineBreaks = (text.match(/\n/g) || []).length;
+    const estimatedLines = lineBreaks + Math.ceil((text.length - lineBreaks) / 70);
+    
+    // Show "Click for more" only if estimated lines exceed 5
+    return estimatedLines > 5;
   };
 
   const cardStyle = isTaken ? 'opacity-60 grayscale' : 'opacity-100';
@@ -161,19 +168,21 @@ const ItemCard: React.FC<ItemCardProps> = ({
     <div className={`bg-white rounded-[2rem] shadow-sm ${highlightStyle} overflow-hidden flex flex-col h-full transition-all duration-500 hover:shadow-2xl ${cardStyle} relative`}>
       {/* Share Button */}
       {mode === 'FRIEND' && (
-        <button
-          onClick={handleShare}
-          className="absolute top-4 right-4 z-50 bg-white/90 backdrop-blur p-2 rounded-full shadow-lg hover:bg-white transition-all group"
-          aria-label="Share item"
-          title="Share this item"
-        >
-          <Share2 size={16} className={`text-stone-600 group-hover:text-indigo-600 transition-colors ${shareCopied ? 'text-indigo-600' : ''}`} />
+        <div className="absolute top-4 right-4 z-[9999]">
+          <button
+            onClick={handleShare}
+            className="relative bg-white/90 backdrop-blur p-2 rounded-full shadow-lg hover:bg-white transition-all group"
+            aria-label="Share item"
+            title="Share this item"
+          >
+            <Share2 size={16} className={`text-stone-600 group-hover:text-indigo-600 transition-colors ${shareCopied ? 'text-indigo-600' : ''}`} />
+          </button>
           {shareCopied && (
-            <span className="absolute -top-10 right-0 bg-indigo-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-[60] shadow-lg">
+            <div className="absolute -top-12 right-0 bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-2xl z-[10000] pointer-events-none">
               Link copied!
-            </span>
+            </div>
           )}
-        </button>
+        </div>
       )}
       
       {/* Visual Header / Gallery */}
@@ -185,14 +194,28 @@ const ItemCard: React.FC<ItemCardProps> = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+        {/* Current image */}
         <img 
           src={item.images[currentImageIndex]} 
           alt={item.title} 
           loading="lazy"
           decoding="async"
-          className="w-full h-full object-cover transition-opacity duration-500 group-hover:scale-110"
-          style={{ transition: 'opacity 0.5s ease-in-out, transform 1s ease-out' }}
+          className={`absolute inset-0 w-full h-full object-cover group-hover:scale-110 ${
+            nextImageIndex !== null ? 'opacity-0' : 'opacity-100'
+          }`}
+          style={{ transition: 'opacity 3s ease-in-out, transform 1s ease-out' }}
         />
+        {/* Next image (for crossfade) */}
+        {nextImageIndex !== null && (
+          <img 
+            src={item.images[nextImageIndex]} 
+            alt={item.title} 
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 opacity-100"
+            style={{ transition: 'opacity 3s ease-in-out, transform 1s ease-out' }}
+          />
+        )}
         
         {item.images.length > 1 && (
           <>
