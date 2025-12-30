@@ -413,8 +413,8 @@ class BaserowService {
     // Parse format: "Name, Taker" or "Name, Interested"
     const interestedParties: Interest[] = [];
     
-    // Helper to parse name and extract type
-    const parseTakerName = (formattedName: string): { name: string; type: 'TAKE' | 'INTEREST' } => {
+    // Helper to parse name and extract type and question
+    const parseTakerName = (formattedName: string): { name: string; type: 'TAKE' | 'INTEREST'; question?: string } => {
       if (!formattedName) return { name: '', type: 'TAKE' };
       
       // Check if it contains ", Taker" or ", Interested"
@@ -422,8 +422,16 @@ class BaserowService {
         const name = formattedName.replace(', Taker', '').trim();
         return { name, type: 'TAKE' };
       } else if (formattedName.includes(', Interested')) {
-        const name = formattedName.replace(', Interested', '').trim();
-        return { name, type: 'INTEREST' };
+        // Check if there's a question (format: "Name, Interested - Question")
+        if (formattedName.includes(' - ')) {
+          const parts = formattedName.split(' - ');
+          const namePart = parts[0].replace(', Interested', '').trim();
+          const question = parts.slice(1).join(' - ').trim(); // Join in case question contains " - "
+          return { name: namePart, type: 'INTEREST', question };
+        } else {
+          const name = formattedName.replace(', Interested', '').trim();
+          return { name, type: 'INTEREST' };
+        }
       }
       
       // Fallback: if no label, assume it's a taker (for backward compatibility)
@@ -434,12 +442,13 @@ class BaserowService {
     const primaryTakerName = getField(BASEROW_COLUMN_MAPPING.taker_name);
     const primaryTakerTime = getField(BASEROW_COLUMN_MAPPING.taker_time);
     if (primaryTakerName) {
-      const { name, type } = parseTakerName(primaryTakerName);
+      const { name, type, question } = parseTakerName(primaryTakerName);
       if (name) {
         interestedParties.push({
           name,
           timestamp: primaryTakerTime ? new Date(primaryTakerTime).getTime() : Date.now(),
           type,
+          question,
         });
       }
     }
@@ -449,12 +458,13 @@ class BaserowService {
       const nameField = getField(`taker_${i}_name`);
       const timeField = getField(`taker_${i}_time`);
       if (nameField) {
-        const { name, type } = parseTakerName(nameField);
+        const { name, type, question } = parseTakerName(nameField);
         if (name) {
           interestedParties.push({
             name,
             timestamp: timeField ? new Date(timeField).getTime() : Date.now(),
             type,
+            question,
           });
         }
       }
@@ -607,14 +617,17 @@ class BaserowService {
     }
 
     // Split interested parties into taker fields
-    // Format: "Name, Taker" or "Name, Interested" based on type
+    // Format: "Name, Taker" or "Name, Interested" (or "Name, Interested - Question" if question exists)
     // Store in sequence: taker_name (first), then taker_1_name, taker_2_name, etc.
     
     if (item.interestedParties.length > 0) {
       // Primary taker (first person) - goes to taker_name/taker_time
       const primaryParty = item.interestedParties[0];
       const primaryLabel = primaryParty.type === 'TAKE' ? 'Taker' : 'Interested';
-      const primaryNameFormatted = `${primaryParty.name}, ${primaryLabel}`;
+      // Include question if it exists and type is INTEREST
+      const primaryNameFormatted = primaryParty.question && primaryParty.type === 'INTEREST'
+        ? `${primaryParty.name}, ${primaryLabel} - ${primaryParty.question}`
+        : `${primaryParty.name}, ${primaryLabel}`;
       await setField(BASEROW_COLUMN_MAPPING.taker_name, primaryNameFormatted);
       await setField(BASEROW_COLUMN_MAPPING.taker_time, new Date(primaryParty.timestamp).toISOString().split('T')[0]);
       
@@ -623,7 +636,10 @@ class BaserowService {
         const party = item.interestedParties[i]; // Note: i, not i-1, since first is in primary
         if (party) {
           const label = party.type === 'TAKE' ? 'Taker' : 'Interested';
-          const nameFormatted = `${party.name}, ${label}`;
+          // Include question if it exists and type is INTEREST
+          const nameFormatted = party.question && party.type === 'INTEREST'
+            ? `${party.name}, ${label} - ${party.question}`
+            : `${party.name}, ${label}`;
           await setField(`taker_${i}_name`, nameFormatted);
           await setField(`taker_${i}_time`, new Date(party.timestamp).toISOString().split('T')[0]);
         } else {
