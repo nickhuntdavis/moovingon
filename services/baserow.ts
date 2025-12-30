@@ -263,6 +263,36 @@ class BaserowService {
   }
 
   /**
+   * Compress image if it's large enough to benefit from compression
+   * Uses canvas-based compression to reduce file size
+   */
+  private async compressImageIfNeeded(file: File): Promise<File> {
+    // Only compress images larger than 500KB
+    if (file.size < 500 * 1024) {
+      return file;
+    }
+
+    const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!imageTypes.includes(file.type)) {
+      return file;
+    }
+
+    try {
+      // Import compression utility
+      const { compressImage, shouldCompressImage } = await import('../utils/imageOptimization');
+      
+      if (shouldCompressImage(file)) {
+        console.log(`🗜️ Compressing image: ${file.name} (${(file.size / 1024).toFixed(2)} KB)...`);
+        return await compressImage(file, 1920, 1920, 0.85);
+      }
+    } catch (err) {
+      console.warn('⚠️ Image compression failed, using original:', err);
+    }
+
+    return file;
+  }
+
+  /**
    * Get table fields/columns to understand the schema
    */
   async getTableFields(): Promise<BaserowField[]> {
