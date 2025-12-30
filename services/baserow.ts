@@ -316,9 +316,20 @@ class BaserowService {
       const items = await Promise.all(
         data.results.map(async (row, index) => {
           try {
+            console.log(`\n🔄 Processing row ${index + 1} (ID: ${row.id})...`);
             const convertedRow = await this.convertRowFieldIdsToNames(row);
+            // Log image fields before mapping
+            for (let i = 1; i <= 4; i++) {
+              const imageField = convertedRow[`image_${i}`];
+              if (imageField) {
+                console.log(`  📷 image_${i} for row ${row.id}:`, Array.isArray(imageField) ? `Array(${imageField.length})` : typeof imageField);
+              }
+            }
             const item = this.mapRowToItem(convertedRow);
-            console.log(`✅ Mapped row ${index + 1}: ${item.title || 'Untitled'}`);
+            console.log(`✅ Mapped row ${index + 1} (ID: ${row.id}): "${item.title || 'Untitled'}" with ${item.images.length} image(s)`);
+            if (item.images.length > 0) {
+              console.log(`   Image URLs: ${item.images.map(url => url.substring(0, 60)).join(', ')}...`);
+            }
             return item;
           } catch (err) {
             console.error(`❌ Error mapping row ${index + 1}:`, err);
