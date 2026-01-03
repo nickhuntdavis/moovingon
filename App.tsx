@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PackageOpen, Plus, Heart, MapPin, Clock as ClockIcon, MessageCircle, AlertCircle, ArrowUpDown, Users } from 'lucide-react';
+import { PackageOpen, Plus, Heart, MapPin, Clock as ClockIcon, MessageCircle, AlertCircle, ArrowUpDown, Users, Grid3x3, List, Search, X } from 'lucide-react';
 import { Item, ViewMode, ItemStatus } from './types';
 import { INITIAL_ITEMS } from './constants';
 import ItemCard from './components/ItemCard';
@@ -28,6 +28,9 @@ export default function App() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const [shuffledItems, setShuffledItems] = useState<Item[]>([]);
+  const [mobileLayout, setMobileLayout] = useState<'vertical' | 'dense'>('vertical');
+  const [adminSearchQuery, setAdminSearchQuery] = useState<string>('');
+  const [lastClickTime, setLastClickTime] = useState<number>(0);
 
   // --- Load items from Baserow on mount ---
   useEffect(() => {
@@ -322,7 +325,21 @@ export default function App() {
   };
 
   // --- Derived State ---
-  const sortedItems = [...items].sort((a, b) => {
+  // Filter items for admin search
+  const filteredItems = viewMode === 'ADMIN' && adminSearchQuery
+    ? items.filter(item => {
+        const query = adminSearchQuery.toLowerCase();
+        return (
+          item.title.toLowerCase().includes(query) ||
+          (item.description && item.description.toLowerCase().includes(query)) ||
+          item.price.toString().includes(query) ||
+          item.condition.toLowerCase().includes(query) ||
+          item.status.toLowerCase().includes(query)
+        );
+      })
+    : items;
+
+  const sortedItems = [...filteredItems].sort((a, b) => {
      // First, sort by status (AVAILABLE → RESERVED → TAKEN)
      const statusOrder = { 'AVAILABLE': 0, 'RESERVED': 1, 'TAKEN': 2 };
      const statusDiff = statusOrder[a.status] - statusOrder[b.status];
@@ -464,7 +481,22 @@ export default function App() {
               </div>
 
               <div className="hidden lg:block space-y-3 md:space-y-4 lg:pt-4">
-                <div className="flex items-start gap-3 bg-white p-5 rounded-2xl border border-stone-200 shadow-sm transition-transform hover:-translate-y-1">
+                <div 
+                  className="flex items-start gap-3 bg-white p-5 rounded-2xl border border-stone-200 shadow-sm transition-transform hover:-translate-y-1 cursor-pointer"
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    const now = Date.now();
+                    if (now - lastClickTime < 500) {
+                      // Double-click detected
+                      if (isAdminAuthenticated) {
+                        setViewMode('ADMIN');
+                      } else {
+                        setIsAuthModalOpen(true);
+                      }
+                    }
+                    setLastClickTime(now);
+                  }}
+                >
                   <ClockIcon className="text-indigo-500 mt-1 flex-shrink-0" size={24} />
                   <div>
                     <h4 className="font-black text-sm uppercase tracking-tight">Gone by Mid Jan</h4>
@@ -503,7 +535,22 @@ export default function App() {
               {/* Mobile: Horizontal scrollable info cards */}
               <div className="lg:hidden -mx-4 px-4 overflow-x-auto pb-2">
                 <div className="flex gap-3 min-w-max">
-                  <div className="flex items-start gap-2 bg-white p-3 rounded-xl border border-stone-200 shadow-sm flex-shrink-0 min-w-[200px]">
+                  <div 
+                    className="flex items-start gap-2 bg-white p-3 rounded-xl border border-stone-200 shadow-sm flex-shrink-0 min-w-[200px] cursor-pointer"
+                    onDoubleClick={(e) => {
+                      e.preventDefault();
+                      const now = Date.now();
+                      if (now - lastClickTime < 500) {
+                        // Double-click detected
+                        if (isAdminAuthenticated) {
+                          setViewMode('ADMIN');
+                        } else {
+                          setIsAuthModalOpen(true);
+                        }
+                      }
+                      setLastClickTime(now);
+                    }}
+                  >
                     <ClockIcon className="text-indigo-500 mt-0.5 flex-shrink-0" size={18} />
                     <div>
                       <h4 className="font-black text-xs uppercase tracking-tight">Gone by Mid Jan</h4>
@@ -555,41 +602,55 @@ export default function App() {
           </div>
         )}
 
-        {/* Sort Controls - Mobile only, show in friend view */}
+        {/* Sort Controls and Layout Toggle - Mobile only, show in friend view */}
         {!isLoading && viewMode === 'FRIEND' && (
-          <div className="md:hidden mb-6 flex items-center gap-3 flex-wrap">
-            <ArrowUpDown size={16} className="text-stone-400" />
-            <span className="text-xs font-bold text-stone-600">Sort:</span>
-            <div className="flex gap-2">
+          <div className="md:hidden mb-6 space-y-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <ArrowUpDown size={16} className="text-stone-400" />
+              <span className="text-xs font-bold text-stone-600">Sort:</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleSortClick('default')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    sortBy === 'default'
+                      ? 'bg-indigo-500 text-white shadow-lg'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  Default
+                </button>
+                <button
+                  onClick={() => handleSortClick('price')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    sortBy === 'price'
+                      ? 'bg-indigo-500 text-white shadow-lg'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  Price {sortBy === 'price' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </button>
+                <button
+                  onClick={() => handleSortClick('condition')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    sortBy === 'condition'
+                      ? 'bg-indigo-500 text-white shadow-lg'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  Condition {sortBy === 'condition' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </button>
+              </div>
+            </div>
+            {/* Layout Toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-stone-600">Layout:</span>
               <button
-                onClick={() => handleSortClick('default')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  sortBy === 'default'
-                    ? 'bg-indigo-500 text-white shadow-lg'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
+                onClick={() => setMobileLayout(mobileLayout === 'vertical' ? 'dense' : 'vertical')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-stone-100 text-stone-600 hover:bg-stone-200"
+                aria-label="Toggle layout"
               >
-                Default
-              </button>
-              <button
-                onClick={() => handleSortClick('price')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  sortBy === 'price'
-                    ? 'bg-indigo-500 text-white shadow-lg'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                Price {sortBy === 'price' && (sortDirection === 'asc' ? '↑' : '↓')}
-              </button>
-              <button
-                onClick={() => handleSortClick('condition')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  sortBy === 'condition'
-                    ? 'bg-indigo-500 text-white shadow-lg'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                Condition {sortBy === 'condition' && (sortDirection === 'asc' ? '↑' : '↓')}
+                {mobileLayout === 'vertical' ? <Grid3x3 size={16} /> : <List size={16} />}
+                <span>{mobileLayout === 'vertical' ? 'Cards' : 'Dense'}</span>
               </button>
             </div>
           </div>
@@ -597,26 +658,79 @@ export default function App() {
 
         {/* Item Grid */}
         {!isLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
-            {sortedItems.map(item => (
-              <div key={item.id} id={`item-${item.id}`}>
-                <ItemCard
-                  item={item}
-                  mode={viewMode}
-                  onExpressInterest={handleExpressInterest}
-                  onUpdateStatus={handleUpdateStatus}
-                  onDelete={handleDeleteItem}
-                  onEdit={() => { 
-                    setEditingItem(item); 
-                    setIsAddingItem(false); 
-                    document.getElementById('item-form')?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  onRemoveTaker={viewMode === 'ADMIN' ? handleRemoveTaker : undefined}
-                  isHighlighted={highlightedItemId === item.id}
-                />
+          <>
+            {viewMode === 'ADMIN' && adminSearchQuery && sortedItems.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-stone-400 text-lg">No items found matching "{adminSearchQuery}"</p>
+                <button
+                  onClick={() => setAdminSearchQuery('')}
+                  className="mt-4 text-indigo-400 hover:text-indigo-300 text-sm font-bold"
+                >
+                  Clear search
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+            {viewMode === 'FRIEND' && mobileLayout === 'dense' ? (
+              // Dense mobile layout
+              <div className="md:hidden space-y-3">
+                {sortedItems.map(item => (
+                  <div key={item.id} id={`item-${item.id}`} className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden flex flex-row h-32">
+                    <div className="w-1/3 aspect-square bg-stone-100 overflow-hidden">
+                      <img 
+                        src={item.images[0] || ''} 
+                        alt={item.title} 
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="w-2/3 p-3 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-sm font-black text-stone-900 leading-tight mb-1 line-clamp-2">{item.title}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-bold text-indigo-600">€{item.price}</span>
+                          <span className="text-[10px] text-stone-400 uppercase">{item.condition}</span>
+                        </div>
+                      </div>
+                      {item.status === 'AVAILABLE' && (
+                        <button
+                          onClick={() => handleExpressInterest(item.id, '', 'TAKE')}
+                          className="text-xs font-black bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          I'll take it
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              // Standard vertical layout
+              <div className={`grid grid-cols-1 ${mobileLayout === 'dense' ? 'sm:grid-cols-1' : 'sm:grid-cols-2'} lg:grid-cols-3 gap-8 md:gap-10`}>
+                {sortedItems.map(item => (
+                  <div key={item.id} id={`item-${item.id}`}>
+                    <ItemCard
+                      item={item}
+                      mode={viewMode}
+                      onExpressInterest={handleExpressInterest}
+                      onUpdateStatus={handleUpdateStatus}
+                      onDelete={handleDeleteItem}
+                      onEdit={() => { 
+                        setEditingItem(item); 
+                        setIsAddingItem(false);
+                        if (viewMode === 'ADMIN') {
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        } else {
+                          document.getElementById('item-form')?.scrollIntoView({ behavior: 'smooth' });
+                        }
+                      }}
+                      onRemoveTaker={viewMode === 'ADMIN' ? handleRemoveTaker : undefined}
+                      isHighlighted={highlightedItemId === item.id}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
 

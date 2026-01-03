@@ -87,7 +87,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
     >
       <button

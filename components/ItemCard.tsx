@@ -123,7 +123,11 @@ const ItemCard: React.FC<ItemCardProps> = ({
   const stripHtml = (html: string) => {
     const tmp = document.createElement("DIV");
     tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || "";
+    // Replace block elements and line breaks with spaces to preserve sentence spacing
+    let text = tmp.textContent || tmp.innerText || "";
+    // Replace multiple spaces with single space, but preserve sentence boundaries
+    text = text.replace(/\s+/g, ' ').trim();
+    return text;
   };
 
   const renderRichText = (html: string) => {
